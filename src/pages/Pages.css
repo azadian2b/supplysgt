@@ -1,0 +1,142 @@
+.page-container {
+  padding: 1rem;
+  max-width: 800px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.page-container h1 {
+  margin-bottom: 2rem;
+  font-size: 1.8rem;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+}
+
+.primary-button, .secondary-button {
+  padding: 0.75rem 1.5rem;
+  border-radius: 4px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+  font-size: 1rem;
+}
+
+.primary-button {
+  background-color: var(--primary-color);
+  color: white;
+}
+
+.primary-button:hover {
+  background-color: var(--primary-color-dark);
+}
+
+.secondary-button {
+  background-color: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-color);
+}
+
+.secondary-button:hover {
+  background-color: var(--background-color-secondary);
+}
+
+.primary-button:disabled,
+.secondary-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.group-button {
+  padding: 0.75rem 1.5rem;
+  border-radius: 4px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+  font-size: 1rem;
+  background-color: #9c27b0; /* Purple color for group button */
+  color: white;
+}
+
+.group-button:hover {
+  background-color: #7b1fa2; /* Darker purple on hover */
+}
+
+.group-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.master-button {
+  padding: 0.75rem 1.5rem;
+  border-radius: 4px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+  font-size: 1rem;
+  background-color: #ff9800; /* Orange color for master data button */
+  color: white;
+}
+
+.master-button:hover {
+  background-color: #f57c00; /* Darker orange on hover */
+}
+
+.master-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+  .page-container h1 {
+    font-size: 1.5rem;
+  }
+  
+  .action-buttons {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .primary-button, 
+  .secondary-button,
+  .group-button,
+  .master-button {
+    width: 100%;
+  }
+}
+
+/* Admin section styles */
+.admin-actions {
+  margin-top: 30px;
+  padding: 15px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.admin-actions h3 {
+  font-size: 1.1rem;
+  color: #666;
+  margin-bottom: 15px;
+}
+
+.admin-button {
+  background-color: #757575;
+  color: white;
+  border: none;
+  padding: 10px 15px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  margin-right: 10px;
+  margin-bottom: 10px;
+}
+
+.admin-button:hover {
+  background-color: #616161;
+} 

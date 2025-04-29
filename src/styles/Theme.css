@@ -1,0 +1,121 @@
+:root {
+  /* Light mode (default) */
+  --background-color: #ffffff;
+  --text-color: #333333;
+  --primary-button-bg: #4CAF50;
+  --primary-button-text: white;
+  --secondary-button-bg: #f44336;
+  --secondary-button-text: white;
+  --table-header-bg: #f2f2f2;
+  --table-border: #ddd;
+  --table-row-hover: #f5f5f5;
+  --form-bg: #f9f9f9;
+  --form-input-border: #ddd;
+  --form-shadow: rgba(0, 0, 0, 0.1);
+  --modal-overlay: rgba(0, 0, 0, 0.5);
+  --modal-bg: white;
+  --warning-bg: #ffebee;
+  --warning-border: #ffcdd2;
+  --warning-text: #c62828;
+  --info-bg: #e9f7ef;
+  --info-border: #d5f5e3;
+  --info-text: #2196F3;
+}
+
+/* Dark mode (night vision) */
+[data-theme='dark'] {
+  --background-color: #000000;
+  --text-color: #ff0000; /* Red text for night vision */
+  --primary-button-bg: #ff0000; /* Red buttons */
+  --primary-button-text: #000000; /* Black text on buttons */
+  --secondary-button-bg: #ff0000;
+  --secondary-button-text: #000000;
+  --table-header-bg: #1a1a1a;
+  --table-border: #333333;
+  --table-row-hover: #1a1a1a;
+  --form-bg: #121212;
+  --form-input-border: #333333;
+  --form-shadow: rgba(0, 0, 0, 0.3);
+  --modal-overlay: rgba(0, 0, 0, 0.8);
+  --modal-bg: #121212;
+  --warning-bg: #330000;
+  --warning-border: #660000;
+  --warning-text: #ff6666;
+  --info-bg: #001a00;
+  --info-border: #003300;
+  --info-text: #ff0000;
+}
+
+/* Apply theme variables to body */
+body {
+  background-color: var(--background-color);
+  color: var(--text-color);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Common button styles */
+button {
+  background-color: var(--primary-button-bg);
+  color: var(--primary-button-text);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Override specific button classes */
+.add-soldier-btn, .submit-btn, .save-btn {
+  background-color: var(--primary-button-bg);
+  color: var(--primary-button-text);
+}
+
+.cancel-btn, .delete-btn, .reset-btn {
+  background-color: var(--secondary-button-bg);
+  color: var(--secondary-button-text);
+}
+
+.assign-btn, .edit-btn, .diag-btn {
+  background-color: var(--primary-button-bg);
+  color: var(--primary-button-text);
+}
+
+/* Table styles */
+.roster-table th {
+  background-color: var(--table-header-bg);
+}
+
+.roster-table td, .roster-table th {
+  border-color: var(--table-border);
+}
+
+.roster-table tr:hover {
+  background-color: var(--table-row-hover);
+}
+
+/* Form styles */
+.add-soldier-form, .edit-soldier-form, .profile-form {
+  background-color: var(--form-bg);
+  box-shadow: 0 2px 4px var(--form-shadow);
+}
+
+input, select {
+  background-color: var(--background-color);
+  color: var(--text-color);
+  border-color: var(--form-input-border);
+}
+
+/* Modal styles */
+.delete-soldier-modal {
+  background-color: var(--modal-overlay);
+}
+
+.modal-content {
+  background-color: var(--modal-bg);
+}
+
+.warning-box {
+  background-color: var(--warning-bg);
+  border-color: var(--warning-border);
+  color: var(--warning-text);
+}
+
+.sync-notice {
+  color: var(--info-text);
+} 

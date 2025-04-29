@@ -1,0 +1,190 @@
+type UIC @model 
+@auth(rules: [
+  { allow: private },
+  { allow: owner, operations: [read] }
+]) {
+  id: ID!
+  uicCode: String! @index # Add this field for the 6-character code
+  name: String!
+  members: [User] @hasMany(indexName: "byUIC", fields: ["id"])
+  membershipRequests: [UICMembershipRequest] @hasMany(indexName: "byUIC", fields: ["id"])
+  soldiers: [Soldier] @hasMany(indexName: "byUIC", fields: ["id"])
+  equipmentItems: [EquipmentItem] @hasMany(indexName: "byUIC", fields: ["id"])
+  equipmentGroups: [EquipmentGroup] @hasMany(indexName: "byUIC", fields: ["id"])
+  handReceiptStatuses: [HandReceiptStatus] @hasMany(indexName: "byFromUIC", fields: ["id"])
+}
+
+type User @model 
+@auth(rules: [
+  { allow: owner },
+  { allow: private, operations: [read] }
+]) {
+  id: ID!
+  owner: String! @index(name: "byOwner")
+  firstName: String!
+  lastName: String!
+  rank: String!
+  role: Role!
+  uicID: ID @index(name: "byUIC")
+  uic: UIC @belongsTo(fields: ["uicID"])
+  # Add this field to establish the relationship with UICMembershipRequest
+  membershipRequests: [UICMembershipRequest] @hasMany(indexName: "byUser", fields: ["id"])
+  # To avoid circular dependency, we'll just store the ID without @belongsTo
+  linkedSoldierId: ID
+  # Add a field to let us look up Users from Soldiers
+  soldiersLinked: [Soldier] @hasMany(indexName: "byUser", fields: ["id"])
+}
+
+type UICMembershipRequest @model 
+@auth(rules: [
+  { allow: owner, ownerField: "userID" },
+  { allow: private }
+]) {
+  id: ID!
+  userID: ID! @index(name: "byUser") # Add index for the relationship
+  uicID: ID! @index(name: "byUIC")
+  user: User @belongsTo(fields: ["userID"])
+  uic: UIC @belongsTo(fields: ["uicID"])
+  requestedRole: Role!
+  status: RequestStatus!
+  createdAt: AWSDateTime!
+}
+
+# New Soldier model for tracking all soldiers in a UIC
+type Soldier @model
+@auth(rules: [
+  { allow: private },
+  { allow: owner, ownerField: "uicID", operations: [read] }
+]) {
+  id: ID!
+  firstName: String!
+  lastName: String!
+  rank: String
+  email: String
+  phone: String
+  uicID: ID! @index(name: "byUIC")
+  uic: UIC @belongsTo(fields: ["uicID"])
+  role: Role!
+  userId: ID @index(name: "byUser") # Added index for relationship
+  user: User @belongsTo(fields: ["userId"]) # Keep this relationship
+  hasAccount: Boolean! # Flag to indicate if the soldier has an app account
+  assignedEquipmentItems: [EquipmentItem] @hasMany(indexName: "byAssignedTo", fields: ["id"])
+  assignedEquipmentGroups: [EquipmentGroup] @hasMany(indexName: "byAssignedTo", fields: ["id"])
+  handReceiptStatuses: [HandReceiptStatus] @hasMany(indexName: "byToSoldier", fields: ["id"])
+  createdAt: AWSDateTime!
+  updatedAt: AWSDateTime!
+}
+
+enum Role {
+  COMMANDER
+  SUPPLY_SERGEANT
+  FIRST_SERGEANT
+  SOLDIER
+  PENDING
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+# Equipment Master Item definition
+type EquipmentMaster @model
+@auth(rules: [
+  { allow: private }
+]) {
+  id: ID!
+  nsn: String! @index(name: "byNSN", queryField: "equipmentMasterByNSN")
+  commonName: String!
+  description: String
+  tmNumber: String
+  isSerialTracked: Boolean!
+  isSensitiveItem: Boolean!
+  isConsumable: Boolean!
+  isCyclicInventory: Boolean!
+  isSensitiveInventory: Boolean!
+  storageRestrictions: String
+  maintenanceSchedule: String
+  imageKey: String  # S3 Storage key for the item image
+  subComponents: [String]  # Array of NSNs for related components
+  equipmentItems: [EquipmentItem] @hasMany(indexName: "byEquipmentMaster", fields: ["id"])
+}
+
+# Specific Equipment Items based on the master item
+type EquipmentItem @model
+@auth(rules: [
+  { allow: private }
+]) {
+  id: ID!
+  uicID: ID! @index(name: "byUIC") 
+  uic: UIC @belongsTo(fields: ["uicID"])
+  equipmentMasterID: ID! @index(name: "byEquipmentMaster")
+  equipmentMaster: EquipmentMaster @belongsTo(fields: ["equipmentMasterID"])
+  nsn: String!  # We'll still store the NSN for easier reference
+  lin: String!
+  serialNumber: String
+  stockNumber: String
+  location: String
+  assignedToID: ID @index(name: "byAssignedTo")
+  assignedTo: Soldier @belongsTo(fields: ["assignedToID"])
+  maintenanceStatus: MaintenanceStatus
+  isPartOfGroup: Boolean
+  groupID: ID @index(name: "byEquipmentGroup")
+  equipmentGroup: EquipmentGroup @belongsTo(fields: ["groupID"])
+  handReceiptStatuses: [HandReceiptStatus] @hasMany(indexName: "byEquipmentItem", fields: ["id"])
+  createdAt: AWSDateTime!
+  updatedAt: AWSDateTime!
+}
+
+# Groups of equipment items
+type EquipmentGroup @model
+@auth(rules: [
+  { allow: private }
+]) {
+  id: ID!
+  name: String!
+  description: String
+  uicID: ID! @index(name: "byUIC")
+  uic: UIC @belongsTo(fields: ["uicID"])
+  equipmentItems: [EquipmentItem] @hasMany(indexName: "byEquipmentGroup", fields: ["id"])
+  assignedToID: ID @index(name: "byAssignedTo")
+  assignedTo: Soldier @belongsTo(fields: ["assignedToID"])
+  createdAt: AWSDateTime!
+  updatedAt: AWSDateTime!
+}
+
+# Hand Receipt Status to track issued equipment
+type HandReceiptStatus @model
+@auth(rules: [
+  { allow: private }
+]) {
+  id: ID!
+  receiptNumber: String! @index(name: "byReceiptNumber")
+  status: HandReceiptStatusType!
+  fromUIC: ID! @index(name: "byFromUIC")
+  uic: UIC @belongsTo(fields: ["fromUIC"])
+  toSoldierID: ID! @index(name: "byToSoldier")
+  soldier: Soldier @belongsTo(fields: ["toSoldierID"])
+  equipmentItemID: ID! @index(name: "byEquipmentItem")
+  equipmentItem: EquipmentItem @belongsTo(fields: ["equipmentItemID"])
+  issuedOn: AWSDateTime
+  returnedOn: AWSDateTime
+  pdfS3Key: String
+  createdAt: AWSDateTime!
+  updatedAt: AWSDateTime!
+}
+
+enum HandReceiptStatusType {
+  GENERATED
+  ISSUED
+  RETURNED
+}
+
+enum MaintenanceStatus {
+  OPERATIONAL
+  MAINTENANCE_REQUIRED
+  IN_MAINTENANCE
+  DEADLINED
+  MISSING
+} 

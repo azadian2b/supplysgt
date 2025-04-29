@@ -1,0 +1,14 @@
+{
+  "resourceName": "MTOEimages",
+  "policyUUID": "8d904e1a",
+  "bucketName": "supplysgtapp143c061359bc4407bdefc8dd9b6c476e",
+  "storageAccess": "auth",
+  "guestAccess": [],
+  "authAccess": [
+    "CREATE_AND_UPDATE",
+    "READ",
+    "DELETE"
+  ],
+  "triggerFunction": "NONE",
+  "groupAccess": {}
+}

@@ -1,0 +1,242 @@
+{
+  "api": {
+    "supplysgtapp": {
+      "dependsOn": [
+        {
+          "attributes": [
+            "UserPoolId"
+          ],
+          "category": "auth",
+          "resourceName": "supplysgtapp2f24982c"
+        }
+      ],
+      "output": {
+        "authConfig": {
+          "additionalAuthenticationProviders": [],
+          "defaultAuthentication": {
+            "authenticationType": "AMAZON_COGNITO_USER_POOLS",
+            "userPoolConfig": {
+              "userPoolId": "authsupplysgtapp2f24982c"
+            }
+          }
+        }
+      },
+      "providerPlugin": "awscloudformation",
+      "service": "AppSync"
+    }
+  },
+  "auth": {
+    "supplysgtapp2f24982c": {
+      "customAuth": false,
+      "dependsOn": [
+        {
+          "attributes": [
+            "Arn",
+            "Name"
+          ],
+          "category": "function",
+          "resourceName": "supplysgtapp2f24982cCustomMessage",
+          "triggerProvider": "Cognito"
+        },
+        {
+          "attributes": [
+            "Arn",
+            "Name"
+          ],
+          "category": "function",
+          "resourceName": "supplysgtapp2f24982cPreSignup",
+          "triggerProvider": "Cognito"
+        }
+      ],
+      "frontendAuthConfig": {
+        "mfaConfiguration": "OFF",
+        "mfaTypes": [
+          "SMS"
+        ],
+        "passwordProtectionSettings": {
+          "passwordPolicyCharacters": [],
+          "passwordPolicyMinLength": 8
+        },
+        "signupAttributes": [
+          "EMAIL",
+          "NAME"
+        ],
+        "socialProviders": [],
+        "usernameAttributes": [
+          "EMAIL"
+        ],
+        "verificationMechanisms": [
+          "EMAIL"
+        ]
+      },
+      "providerPlugin": "awscloudformation",
+      "service": "Cognito"
+    }
+  },
+  "function": {
+    "approvalNotifier": {
+      "build": true,
+      "dependsOn": [
+        {
+          "attributes": [
+            "GraphQLAPIIdOutput",
+            "GraphQLAPIEndpointOutput"
+          ],
+          "category": "api",
+          "resourceName": "supplysgtapp"
+        },
+        {
+          "attributes": [
+            "UserPoolId"
+          ],
+          "category": "auth",
+          "resourceName": "supplysgtapp2f24982c"
+        }
+      ],
+      "providerPlugin": "awscloudformation",
+      "service": "Lambda"
+    },
+    "supplysgtapp2f24982cCustomMessage": {
+      "build": true,
+      "providerPlugin": "awscloudformation",
+      "service": "Lambda"
+    },
+    "supplysgtapp2f24982cPreSignup": {
+      "build": true,
+      "providerPlugin": "awscloudformation",
+      "service": "Lambda"
+    }
+  },
+  "hosting": {
+    "amplifyhosting": {
+      "providerPlugin": "awscloudformation",
+      "service": "amplifyhosting",
+      "type": "manual"
+    }
+  },
+  "parameters": {
+    "AMPLIFY_function_approvalNotifier_deploymentBucketName": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "approvalNotifier"
+        }
+      ]
+    },
+    "AMPLIFY_function_approvalNotifier_fromEmail": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "approvalNotifier"
+        }
+      ]
+    },
+    "AMPLIFY_function_approvalNotifier_s3Key": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "approvalNotifier"
+        }
+      ]
+    },
+    "AMPLIFY_function_approvalNotifier_userPoolId": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "approvalNotifier"
+        }
+      ]
+    },
+    "AMPLIFY_function_supplysgtapp2f24982cCustomMessage_EMAILMESSAGE": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "supplysgtapp2f24982cCustomMessage"
+        }
+      ]
+    },
+    "AMPLIFY_function_supplysgtapp2f24982cCustomMessage_EMAILSUBJECT": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "supplysgtapp2f24982cCustomMessage"
+        }
+      ]
+    },
+    "AMPLIFY_function_supplysgtapp2f24982cCustomMessage_REDIRECTURL": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "supplysgtapp2f24982cCustomMessage"
+        }
+      ]
+    },
+    "AMPLIFY_function_supplysgtapp2f24982cCustomMessage_deploymentBucketName": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "supplysgtapp2f24982cCustomMessage"
+        }
+      ]
+    },
+    "AMPLIFY_function_supplysgtapp2f24982cCustomMessage_s3Key": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "supplysgtapp2f24982cCustomMessage"
+        }
+      ]
+    },
+    "AMPLIFY_function_supplysgtapp2f24982cPreSignup_DOMAINALLOWLIST": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "supplysgtapp2f24982cPreSignup"
+        }
+      ]
+    },
+    "AMPLIFY_function_supplysgtapp2f24982cPreSignup_deploymentBucketName": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "supplysgtapp2f24982cPreSignup"
+        }
+      ]
+    },
+    "AMPLIFY_function_supplysgtapp2f24982cPreSignup_s3Key": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "supplysgtapp2f24982cPreSignup"
+        }
+      ]
+    },
+    "AMPLIFY_hosting_amplifyhosting_appId": {
+      "usedBy": [
+        {
+          "category": "hosting",
+          "resourceName": "amplifyhosting"
+        }
+      ]
+    },
+    "AMPLIFY_hosting_amplifyhosting_type": {
+      "usedBy": [
+        {
+          "category": "hosting",
+          "resourceName": "amplifyhosting"
+        }
+      ]
+    }
+  },
+  "storage": {
+    "MTOEimages": {
+      "dependsOn": [],
+      "providerPlugin": "awscloudformation",
+      "service": "S3"
+    },
+    "dynamo4062985a": {
+      "providerPlugin": "awscloudformation",
+      "service": "DynamoDB"
+    }
+  }
+}

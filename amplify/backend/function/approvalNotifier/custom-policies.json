@@ -1,0 +1,32 @@
+[
+  {
+    "Effect": "Allow",
+    "Action": [
+      "ses:SendEmail",
+      "ses:SendRawEmail"
+    ],
+    "Resource": ["*"]
+  },
+  {
+    "Effect": "Allow",
+    "Action": [
+      "cognito-idp:AdminGetUser",
+      "cognito-idp:ListUsers",
+      "cognito-idp:DescribeUserPool"
+    ],
+    "Resource": ["arn:aws:cognito-idp:*:*:userpool/*"]
+  },
+  {
+    "Effect": "Allow",
+    "Action": [
+      "dynamodb:GetItem",
+      "dynamodb:Query"
+    ],
+    "Resource": [
+      "arn:aws:dynamodb:*:*:table/UIC-*",
+      "arn:aws:dynamodb:*:*:table/User-*",
+      "arn:aws:dynamodb:*:*:table/User-*/index/byOwner",
+      "arn:aws:dynamodb:*:*:table/User-*/index/byUIC"
+    ]
+  }
+] 

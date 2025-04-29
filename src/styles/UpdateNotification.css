@@ -1,0 +1,32 @@
+.update-notification {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: #2196F3;
+  color: white;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+  z-index: 1000;
+  box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
+}
+
+.update-notification p {
+  margin: 0;
+}
+
+.update-notification button {
+  background-color: white;
+  color: #2196F3;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.update-notification button:hover {
+  background-color: #f1f1f1;
+} 

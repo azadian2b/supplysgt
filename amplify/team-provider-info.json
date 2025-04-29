@@ -1,0 +1,54 @@
+{
+  "dev": {
+    "awscloudformation": {
+      "AuthRoleName": "amplify-supplysgtapp-dev-a792b-authRole",
+      "UnauthRoleArn": "arn:aws:iam::147830331682:role/amplify-supplysgtapp-dev-a792b-unauthRole",
+      "AuthRoleArn": "arn:aws:iam::147830331682:role/amplify-supplysgtapp-dev-a792b-authRole",
+      "Region": "us-east-1",
+      "DeploymentBucketName": "amplify-supplysgtapp-dev-a792b-deployment",
+      "UnauthRoleName": "amplify-supplysgtapp-dev-a792b-unauthRole",
+      "StackName": "amplify-supplysgtapp-dev-a792b",
+      "StackId": "arn:aws:cloudformation:us-east-1:147830331682:stack/amplify-supplysgtapp-dev-a792b/27d8f700-02d7-11f0-a128-123f20f81245",
+      "AmplifyAppId": "d14zgqyeayi7ji",
+      "AuthTriggerTemplateURL": "https://s3.amazonaws.com/amplify-supplysgtapp-dev-a792b-deployment/amplify-cfn-templates/auth/auth-trigger-cloudformation-template.json"
+    },
+    "categories": {
+      "auth": {
+        "supplysgtapp2f24982c": {}
+      },
+      "function": {
+        "supplysgtapp2f24982cCustomMessage": {
+          "REDIRECTURL": "supplysgt.net",
+          "EMAILSUBJECT": "Roger, Big Sarge",
+          "EMAILMESSAGE": "Thank you for registering for SupplySGT.net. Your Company Commander thanks you already. Promote ahead of peers.",
+          "deploymentBucketName": "amplify-supplysgtapp-dev-a792b-deployment",
+          "s3Key": "amplify-builds/supplysgtapp2f24982cCustomMessage-394e4b4d796d6e663649-build.zip"
+        },
+        "supplysgtapp2f24982cPreSignup": {
+          "DOMAINALLOWLIST": "army.mil, gmail.com",
+          "deploymentBucketName": "amplify-supplysgtapp-dev-a792b-deployment",
+          "s3Key": "amplify-builds/supplysgtapp2f24982cPreSignup-4a5a4f56376677316e30-build.zip"
+        },
+        "approvalNotifier": {
+          "deploymentBucketName": "amplify-supplysgtapp-dev-a792b-deployment",
+          "s3Key": "amplify-builds/approvalNotifier-4f6776643051706f2b78-build.zip",
+          "userPoolId": "us-east-1_GzkyUvzWd",
+          "fromEmail": "nathaniel.mckinnon@gmail.com"
+        }
+      },
+      "hosting": {
+        "amplifyhosting": {
+          "appId": "d14zgqyeayi7ji",
+          "type": "manual"
+        }
+      },
+      "api": {
+        "supplysgtapp": {}
+      },
+      "storage": {
+        "dynamo4062985a": {},
+        "MTOEimages": {}
+      }
+    }
+  }
+}

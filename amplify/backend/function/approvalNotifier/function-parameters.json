@@ -1,0 +1,50 @@
+{
+  "permissions": {
+    "auth": {
+      "supplysgtapp2f24982c": [
+        "create",
+        "read",
+        "update",
+        "delete"
+      ]
+    },
+    "api": {
+      "supplysgtapp": [
+        "Query",
+        "Mutation",
+        "Subscription"
+      ]
+    },
+    "storage": {
+      "UIC:@model(appsync)": [
+        "create",
+        "read",
+        "update",
+        "delete"
+      ],
+      "User:@model(appsync)": [
+        "create",
+        "read",
+        "update",
+        "delete"
+      ],
+      "UICMembershipRequest:@model(appsync)": [
+        "create",
+        "read",
+        "update",
+        "delete"
+      ]
+    }
+  },
+  "lambdaLayers": [],
+  "environmentVariableList": [
+    {
+      "cloudFormationParameterName": "userPoolId",
+      "environmentVariableName": "USER_POOL_ID"
+    },
+    {
+      "cloudFormationParameterName": "fromEmail",
+      "environmentVariableName": "FROM_EMAIL"
+    }
+  ]
+}
