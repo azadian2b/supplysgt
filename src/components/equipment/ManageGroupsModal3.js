@@ -545,13 +545,12 @@ function ManageGroupsModal3({ onBack }) {
       // Sync changes to local DataStore
       await syncChangesToDataStore();
       
-      // Reset form and refresh data
-      setBaseItem(null);
-      setSelectedComponents([]);
-      setGroupName('');
-      setGroupDescription('');
-      fetchInitialData();
-      setActiveTab('view');
+      // Reset form but stay on create tab and keep success message
+      handleResetCreateForm();
+      
+      // Refresh available items
+      fetchAvailableItems(uicID);
+      fetchExistingGroups(uicID);
     } catch (error) {
       console.error('Error creating group:', error);
       setError('Failed to create equipment group. Please try again.');
@@ -806,8 +805,21 @@ function ManageGroupsModal3({ onBack }) {
       {error && <div className="error-message">{error}</div>}
       {success && <div className="success-message">{success}</div>}
       
-      {/* Loading state */}
-      {loading && <div className="loading-overlay">Loading...</div>}
+      {/* Loading state with retry button */}
+      {loading && (
+        <div className="loading-overlay">
+          <div>Loading...</div>
+          <button 
+            className="retry-button"
+            onClick={() => {
+              setLoading(false);
+              handleResetCreateForm();
+            }}
+          >
+            Cancel and Reset Form
+          </button>
+        </div>
+      )}
       
       {/* Create Group Tab */}
       {activeTab === 'create' && (
@@ -890,7 +902,6 @@ function ManageGroupsModal3({ onBack }) {
                   <div 
                     key={component.id} 
                     className="component-tile"
-                    onClick={() => handleToggleComponent(component)}
                   >
                     {component.imageUrl ? (
                       <img 
@@ -906,10 +917,22 @@ function ManageGroupsModal3({ onBack }) {
                       </div>
                     )}
                     <div className="item-info">
-                      <div className="item-name">{component.commonName}</div>
-                      {component.stockNumber && <span>Stock #: {component.stockNumber}</span>}
+                      <div className="item-name text-ellipsis" title={component.commonName}>{component.commonName}</div>
+                      <div className="item-details">
+                        <span className="text-ellipsis" title={`NSN: ${component.nsn}`}>NSN: {component.nsn}</span>
+                        {component.serialNumber && <span className="text-ellipsis" title={`S/N: ${component.serialNumber}`}>S/N: {component.serialNumber}</span>}
+                        {component.stockNumber && <span className="text-ellipsis" title={`Stock #: ${component.stockNumber}`}>Stock #: {component.stockNumber}</span>}
+                      </div>
                     </div>
-                    <button className="remove-btn">✕</button>
+                    <button 
+                      className="remove-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleToggleComponent(component);
+                      }}
+                    >
+                      ✕
+                    </button>
                   </div>
                 ))}
                 
@@ -1194,6 +1217,47 @@ function ManageGroupsModal3({ onBack }) {
           </div>
         </div>
       )}
+      
+      {/* Add some CSS for text ellipsis right after the return statement */}
+      <style jsx>{`
+        .text-ellipsis {
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          max-width: 100%;
+          display: inline-block;
+        }
+        
+        .retry-button {
+          margin-top: 15px;
+          padding: 8px 16px;
+          background-color: #5a5a5a;
+          color: white;
+          border: none;
+          border-radius: 4px;
+          cursor: pointer;
+        }
+        
+        .retry-button:hover {
+          background-color: #4a4a4a;
+        }
+        
+        .loading-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          align-items: center;
+          background-color: rgba(0, 0, 0, 0.7);
+          color: white;
+          z-index: 1000;
+          font-size: 1.2rem;
+        }
+      `}</style>
     </div>
   );
 }

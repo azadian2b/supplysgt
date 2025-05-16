@@ -37,6 +37,11 @@ export const getUIC = /* GraphQL */ `
         startedAt
         __typename
       }
+      accountabilitySessions {
+        nextToken
+        startedAt
+        __typename
+      }
       createdAt
       updatedAt
       _version
@@ -132,6 +137,16 @@ export const getUser = /* GraphQL */ `
       }
       linkedSoldierId
       soldiersLinked {
+        nextToken
+        startedAt
+        __typename
+      }
+      conductedSessions {
+        nextToken
+        startedAt
+        __typename
+      }
+      verifiedItems {
         nextToken
         startedAt
         __typename
@@ -645,6 +660,11 @@ export const getEquipmentItem = /* GraphQL */ `
         startedAt
         __typename
       }
+      accountabilityItems {
+        nextToken
+        startedAt
+        __typename
+      }
       createdAt
       updatedAt
       _version
@@ -964,6 +984,273 @@ export const syncHandReceiptStatuses = /* GraphQL */ `
         issuedOn
         returnedOn
         pdfS3Key
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        __typename
+      }
+      nextToken
+      startedAt
+      __typename
+    }
+  }
+`;
+export const getAccountabilitySession = /* GraphQL */ `
+  query GetAccountabilitySession($id: ID!) {
+    getAccountabilitySession(id: $id) {
+      id
+      uicID
+      uic {
+        id
+        uicCode
+        name
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        owner
+        __typename
+      }
+      conductedByID
+      conductedBy {
+        id
+        owner
+        firstName
+        lastName
+        rank
+        role
+        uicID
+        linkedSoldierId
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        __typename
+      }
+      status
+      startedAt
+      completedAt
+      itemCount
+      accountedForCount
+      accountabilityItems {
+        nextToken
+        startedAt
+        __typename
+      }
+      createdAt
+      updatedAt
+      _version
+      _deleted
+      _lastChangedAt
+      __typename
+    }
+  }
+`;
+export const listAccountabilitySessions = /* GraphQL */ `
+  query ListAccountabilitySessions(
+    $filter: ModelAccountabilitySessionFilterInput
+    $limit: Int
+    $nextToken: String
+  ) {
+    listAccountabilitySessions(
+      filter: $filter
+      limit: $limit
+      nextToken: $nextToken
+    ) {
+      items {
+        id
+        uicID
+        conductedByID
+        status
+        startedAt
+        completedAt
+        itemCount
+        accountedForCount
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        __typename
+      }
+      nextToken
+      startedAt
+      __typename
+    }
+  }
+`;
+export const syncAccountabilitySessions = /* GraphQL */ `
+  query SyncAccountabilitySessions(
+    $filter: ModelAccountabilitySessionFilterInput
+    $limit: Int
+    $nextToken: String
+    $lastSync: AWSTimestamp
+  ) {
+    syncAccountabilitySessions(
+      filter: $filter
+      limit: $limit
+      nextToken: $nextToken
+      lastSync: $lastSync
+    ) {
+      items {
+        id
+        uicID
+        conductedByID
+        status
+        startedAt
+        completedAt
+        itemCount
+        accountedForCount
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        __typename
+      }
+      nextToken
+      startedAt
+      __typename
+    }
+  }
+`;
+export const getAccountabilityItem = /* GraphQL */ `
+  query GetAccountabilityItem($id: ID!) {
+    getAccountabilityItem(id: $id) {
+      id
+      sessionID
+      session {
+        id
+        uicID
+        conductedByID
+        status
+        startedAt
+        completedAt
+        itemCount
+        accountedForCount
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        __typename
+      }
+      equipmentItemID
+      equipmentItem {
+        id
+        uicID
+        equipmentMasterID
+        nsn
+        lin
+        serialNumber
+        stockNumber
+        location
+        assignedToID
+        maintenanceStatus
+        isPartOfGroup
+        groupID
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        __typename
+      }
+      status
+      verificationMethod
+      verifiedByID
+      verifiedBy {
+        id
+        owner
+        firstName
+        lastName
+        rank
+        role
+        uicID
+        linkedSoldierId
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        __typename
+      }
+      verifiedAt
+      confirmationStatus
+      confirmedAt
+      notes
+      createdAt
+      updatedAt
+      _version
+      _deleted
+      _lastChangedAt
+      __typename
+    }
+  }
+`;
+export const listAccountabilityItems = /* GraphQL */ `
+  query ListAccountabilityItems(
+    $filter: ModelAccountabilityItemFilterInput
+    $limit: Int
+    $nextToken: String
+  ) {
+    listAccountabilityItems(
+      filter: $filter
+      limit: $limit
+      nextToken: $nextToken
+    ) {
+      items {
+        id
+        sessionID
+        equipmentItemID
+        status
+        verificationMethod
+        verifiedByID
+        verifiedAt
+        confirmationStatus
+        confirmedAt
+        notes
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        __typename
+      }
+      nextToken
+      startedAt
+      __typename
+    }
+  }
+`;
+export const syncAccountabilityItems = /* GraphQL */ `
+  query SyncAccountabilityItems(
+    $filter: ModelAccountabilityItemFilterInput
+    $limit: Int
+    $nextToken: String
+    $lastSync: AWSTimestamp
+  ) {
+    syncAccountabilityItems(
+      filter: $filter
+      limit: $limit
+      nextToken: $nextToken
+      lastSync: $lastSync
+    ) {
+      items {
+        id
+        sessionID
+        equipmentItemID
+        status
+        verificationMethod
+        verifiedByID
+        verifiedAt
+        confirmationStatus
+        confirmedAt
+        notes
         createdAt
         updatedAt
         _version
@@ -1654,6 +1941,279 @@ export const handReceiptStatusesByEquipmentItemID = /* GraphQL */ `
       nextToken
       startedAt
       __typename
+    }
+  }
+`;
+export const accountabilitySessionsByUicID = /* GraphQL */ `
+  query AccountabilitySessionsByUicID(
+    $uicID: ID!
+    $sortDirection: ModelSortDirection
+    $filter: ModelAccountabilitySessionFilterInput
+    $limit: Int
+    $nextToken: String
+  ) {
+    accountabilitySessionsByUicID(
+      uicID: $uicID
+      sortDirection: $sortDirection
+      filter: $filter
+      limit: $limit
+      nextToken: $nextToken
+    ) {
+      items {
+        id
+        uicID
+        conductedByID
+        status
+        startedAt
+        completedAt
+        itemCount
+        accountedForCount
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        __typename
+      }
+      nextToken
+      startedAt
+      __typename
+    }
+  }
+`;
+export const accountabilitySessionsByConductedByID = /* GraphQL */ `
+  query AccountabilitySessionsByConductedByID(
+    $conductedByID: ID!
+    $sortDirection: ModelSortDirection
+    $filter: ModelAccountabilitySessionFilterInput
+    $limit: Int
+    $nextToken: String
+  ) {
+    accountabilitySessionsByConductedByID(
+      conductedByID: $conductedByID
+      sortDirection: $sortDirection
+      filter: $filter
+      limit: $limit
+      nextToken: $nextToken
+    ) {
+      items {
+        id
+        uicID
+        conductedByID
+        status
+        startedAt
+        completedAt
+        itemCount
+        accountedForCount
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        __typename
+      }
+      nextToken
+      startedAt
+      __typename
+    }
+  }
+`;
+export const accountabilityItemsBySessionID = /* GraphQL */ `
+  query AccountabilityItemsBySessionID(
+    $sessionID: ID!
+    $sortDirection: ModelSortDirection
+    $filter: ModelAccountabilityItemFilterInput
+    $limit: Int
+    $nextToken: String
+  ) {
+    accountabilityItemsBySessionID(
+      sessionID: $sessionID
+      sortDirection: $sortDirection
+      filter: $filter
+      limit: $limit
+      nextToken: $nextToken
+    ) {
+      items {
+        id
+        sessionID
+        equipmentItemID
+        equipmentItem {
+          id
+          nsn
+          lin
+          serialNumber
+          stockNumber
+          assignedToID
+          equipmentMasterID
+          equipmentMaster {
+            id
+            commonName
+            __typename
+          }
+          __typename
+        }
+        status
+        verificationMethod
+        verifiedByID
+        verifiedAt
+        confirmationStatus
+        confirmedAt
+        notes
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        __typename
+      }
+      nextToken
+      startedAt
+      __typename
+    }
+  }
+`;
+export const accountabilityItemsByEquipmentItemID = /* GraphQL */ `
+  query AccountabilityItemsByEquipmentItemID(
+    $equipmentItemID: ID!
+    $sortDirection: ModelSortDirection
+    $filter: ModelAccountabilityItemFilterInput
+    $limit: Int
+    $nextToken: String
+  ) {
+    accountabilityItemsByEquipmentItemID(
+      equipmentItemID: $equipmentItemID
+      sortDirection: $sortDirection
+      filter: $filter
+      limit: $limit
+      nextToken: $nextToken
+    ) {
+      items {
+        id
+        sessionID
+        equipmentItemID
+        status
+        verificationMethod
+        verifiedByID
+        verifiedAt
+        confirmationStatus
+        confirmedAt
+        notes
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        __typename
+      }
+      nextToken
+      startedAt
+      __typename
+    }
+  }
+`;
+export const accountabilityItemsByVerifiedByID = /* GraphQL */ `
+  query AccountabilityItemsByVerifiedByID(
+    $verifiedByID: ID!
+    $sortDirection: ModelSortDirection
+    $filter: ModelAccountabilityItemFilterInput
+    $limit: Int
+    $nextToken: String
+  ) {
+    accountabilityItemsByVerifiedByID(
+      verifiedByID: $verifiedByID
+      sortDirection: $sortDirection
+      filter: $filter
+      limit: $limit
+      nextToken: $nextToken
+    ) {
+      items {
+        id
+        sessionID
+        equipmentItemID
+        status
+        verificationMethod
+        verifiedByID
+        verifiedAt
+        confirmationStatus
+        confirmedAt
+        notes
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        __typename
+      }
+      nextToken
+      startedAt
+      __typename
+    }
+  }
+`;
+export const getHandReceiptedEquipment = /* GraphQL */ `
+  query GetHandReceiptedEquipment($uicID: ID!) {
+    handReceiptStatusesByFromUIC(
+      fromUIC: $uicID
+      filter: { status: { eq: ISSUED } }
+    ) {
+      items {
+        id
+        receiptNumber
+        status
+        fromUIC
+        toSoldierID
+        equipmentItemID
+        issuedOn
+        returnedOn
+        soldier {
+          id
+          firstName
+          lastName
+          rank
+          role
+        }
+        equipmentItem {
+          id
+          uicID
+          equipmentMasterID
+          nsn
+          lin
+          serialNumber
+          stockNumber
+          location
+          assignedToID
+          maintenanceStatus
+          isPartOfGroup
+          groupID
+          assignedTo {
+            id
+            firstName
+            lastName
+            rank
+            role
+          }
+          equipmentGroup {
+            id
+            name
+            description
+            assignedToID
+          }
+          equipmentMaster {
+            id
+            nsn
+            commonName
+            description
+          }
+        }
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        __typename
+      }
+      nextToken
+      startedAt
     }
   }
 `;

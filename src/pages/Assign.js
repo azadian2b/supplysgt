@@ -3,7 +3,8 @@ import { DataStore, SortDirection } from '@aws-amplify/datastore';
 import { getCurrentUser } from 'aws-amplify/auth';
 import { User, Soldier, UIC, Role } from '../models';
 import './Pages.css';
-import '../styles/Assign.css'; // We'll need to create this file
+import '../styles/Assign.css';
+import '../styles/RosterStyles.css'; // Import new roster styling
 import { ROLES, getRoleLabel } from '../utils/roleUtils'; // Import roles utilities
 import AssignmentModal from '../components/assignment/AssignmentModal';
 import DataStoreUtil from '../utils/DataStoreSync'; // Import DataStore utility

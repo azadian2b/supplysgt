@@ -1,0 +1,89 @@
+/* Modularized Button Styles */
+
+/* Base button styles */
+.btn {
+  padding: 0.75rem 1.5rem;
+  border-radius: 4px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+  font-size: 1rem;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Primary button */
+.btn-primary {
+  background-color: #282c34;
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: #1e2228;
+}
+
+.btn-primary:disabled {
+  background-color: #6c778d;
+}
+
+/* Secondary button */
+.btn-secondary {
+  background-color: #6c778d;
+  color: white;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background-color: #5a6476;
+}
+
+/* Danger button */
+.btn-danger {
+  background-color: #f44336;
+  color: white;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background-color: #d32f2f;
+}
+
+/* Success button */
+.btn-success {
+  background-color: #4CAF50;
+  color: white;
+}
+
+.btn-success:hover:not(:disabled) {
+  background-color: #45a049;
+}
+
+/* Warning button */
+.btn-warning {
+  background-color: #f0ad4e;
+  color: white;
+}
+
+.btn-warning:hover:not(:disabled) {
+  background-color: #ec971f;
+}
+
+/* Small button variation */
+.btn-sm {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.875rem;
+}
+
+/* Large button variation */
+.btn-lg {
+  padding: 1rem 2rem;
+  font-size: 1.2rem;
+}
+
+/* Full width button */
+.btn-block {
+  display: block;
+  width: 100%;
+} 

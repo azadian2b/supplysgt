@@ -22,6 +22,29 @@ const HandReceiptStatusType = {
   "RETURNED": "RETURNED"
 };
 
+const SessionStatus = {
+  "ACTIVE": "ACTIVE",
+  "COMPLETED": "COMPLETED",
+  "CANCELLED": "CANCELLED"
+};
+
+const ItemStatus = {
+  "ACCOUNTED_FOR": "ACCOUNTED_FOR",
+  "NOT_ACCOUNTED_FOR": "NOT_ACCOUNTED_FOR",
+  "VERIFICATION_PENDING": "VERIFICATION_PENDING"
+};
+
+const VerificationMethod = {
+  "DIRECT": "DIRECT",
+  "SELF_SERVICE": "SELF_SERVICE"
+};
+
+const ConfirmationStatus = {
+  "PENDING": "PENDING",
+  "CONFIRMED": "CONFIRMED",
+  "FAILED": "FAILED"
+};
+
 const MaintenanceStatus = {
   "OPERATIONAL": "OPERATIONAL",
   "MAINTENANCE_REQUIRED": "MAINTENANCE_REQUIRED",
@@ -30,7 +53,7 @@ const MaintenanceStatus = {
   "MISSING": "MISSING"
 };
 
-const { UIC, User, UICMembershipRequest, Soldier, EquipmentMaster, EquipmentItem, EquipmentGroup, HandReceiptStatus } = initSchema(schema);
+const { UIC, User, UICMembershipRequest, Soldier, EquipmentMaster, EquipmentItem, EquipmentGroup, HandReceiptStatus, AccountabilitySession, AccountabilityItem } = initSchema(schema);
 
 export {
   UIC,
@@ -41,8 +64,14 @@ export {
   EquipmentItem,
   EquipmentGroup,
   HandReceiptStatus,
+  AccountabilitySession,
+  AccountabilityItem,
   Role,
   RequestStatus,
   HandReceiptStatusType,
+  SessionStatus,
+  ItemStatus,
+  VerificationMethod,
+  ConfirmationStatus,
   MaintenanceStatus
 };

@@ -17,39 +17,23 @@
   flex-wrap: wrap;
 }
 
-.primary-button, .secondary-button {
-  padding: 0.75rem 1.5rem;
-  border-radius: 4px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  border: none;
-  font-size: 1rem;
-}
-
+/* Button styles now imported from Buttons.css */
 .primary-button {
-  background-color: var(--primary-color);
+  background-color: #282c34;
   color: white;
 }
 
 .primary-button:hover {
-  background-color: var(--primary-color-dark);
+  background-color: #1e2228;
 }
 
 .secondary-button {
-  background-color: transparent;
-  border: 1px solid var(--border-color);
-  color: var(--text-color);
+  background-color: #6c778d;
+  color: white;
 }
 
 .secondary-button:hover {
-  background-color: var(--background-color-secondary);
-}
-
-.primary-button:disabled,
-.secondary-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+  background-color: #5a6476;
 }
 
 .group-button {
@@ -126,7 +110,7 @@
 }
 
 .admin-button {
-  background-color: #757575;
+  background-color: #282c34;
   color: white;
   border: none;
   padding: 10px 15px;
@@ -138,5 +122,5 @@
 }
 
 .admin-button:hover {
-  background-color: #616161;
+  background-color: #1e2228;
 } 

@@ -2,9 +2,9 @@
   /* Light mode (default) */
   --background-color: #ffffff;
   --text-color: #333333;
-  --primary-button-bg: #4CAF50;
+  --primary-button-bg: #282c34;
   --primary-button-text: white;
-  --secondary-button-bg: #f44336;
+  --secondary-button-bg: #6c778d;
   --secondary-button-text: white;
   --table-header-bg: #f2f2f2;
   --table-border: #ddd;

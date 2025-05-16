@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { generateClient } from 'aws-amplify/api';
 import { DataStore } from '@aws-amplify/datastore';
 import { getUrl } from 'aws-amplify/storage';
@@ -21,6 +21,10 @@ function AssignmentModal({
   preselectedGroup = null,
   onAssignmentComplete
 }) {
+  // Determine initial filter state based on props
+  const initialShowAssigned = Boolean((preselectedItem && preselectedItem.assignedToID) || 
+                              (preselectedGroup && preselectedGroup.assignedToID));
+
   // State variables
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -37,85 +41,274 @@ function AssignmentModal({
   // Filter state - simplified
   const [soldierSearchTerm, setSoldierSearchTerm] = useState('');
   const [equipmentSearchTerm, setEquipmentSearchTerm] = useState('');
-  const [showAssignedItems, setShowAssignedItems] = useState(false);
-  const [filterChanged, setFilterChanged] = useState(false);
+  const [showAssignedItems, setShowAssignedItems] = useState(initialShowAssigned);
   
   // UI state
   const [activeTab, setActiveTab] = useState(preselectedGroup ? 'groups' : 'items');
   const [processingAssignment, setProcessingAssignment] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
   const assignmentDirection = preselectedSoldier ? 'toEquipment' : 'toSoldier';
   
+  // Ref to track if initial data load has completed
+  const initialLoadCompleteRef = useRef(false);
+  
+  // Ref for detecting clicks outside the dropdown
+  const dropdownRef = useRef(null);
+  
+  // Create client outside of any callbacks to ensure stable reference
   const client = generateClient();
-
-  // Load soldiers just once
-  const loadSoldiers = useCallback(async () => {
-    try {
-      const soldiersResponse = await client.graphql({
-        query: `query GetSoldiersByUIC($uicID: ID!) {
-          soldiersByUicID(uicID: $uicID) {
-            items {
-              id
-              firstName
-              lastName
-              rank
-              role
-              hasAccount
-            }
+  
+  // Helper to create a stable filter object
+  const createFilter = (showAssigned) => {
+    if (!showAssigned) {
+      return {
+        and: [
+          { _deleted: { ne: true } },
+          {
+            or: [
+              { assignedToID: { attributeExists: false } },
+              { assignedToID: { eq: null } }
+            ]
           }
-        }`,
-        variables: { uicID },
-        headers: {
-          "Cache-Control": "no-cache",
-          "x-cache-buster": new Date().getTime().toString()
-        }
-      });
-      
-      const soldiersList = soldiersResponse.data.soldiersByUicID.items;
-      setSoldiers(soldiersList);
-      
-      // If no preselected soldier, and we have soldiers, set the first one
-      if (!preselectedSoldier && soldiersList.length > 0 && assignmentDirection === 'toSoldier') {
-        setSelectedSoldier(soldiersList[0]);
-      }
-      
-      return soldiersList;
-    } catch (error) {
-      console.error('Error loading soldiers:', error);
-      setError('Failed to load soldiers: ' + error.message);
-      return [];
+        ]
+      };
     }
-  }, [uicID, preselectedSoldier, assignmentDirection, client]);
+    return { _deleted: { ne: true } };
+  };
 
-  // Load equipment with filter applied
-  const loadEquipment = useCallback(async () => {
-    try {
-      console.log('Loading equipment items for UIC:', uicID);
-      
-      // Build filter based on showAssignedItems flag
-      let filter = { _deleted: { ne: true } };
-      
-      if (!showAssignedItems) {
-        // Filter for items where assignedToID is either missing or null
-        filter = {
-          and: [
-            { _deleted: { ne: true } },
-            {
-              or: [
-                { assignedToID: { attributeExists: false } },
-                { assignedToID: { eq: null } }
-              ]
+  // Set the active tab based on preselection (only needs to run once)
+  useEffect(() => {
+    if (preselectedGroup) {
+      setActiveTab('groups');
+    } else if (preselectedItem) {
+      setActiveTab('items');
+    }
+  }, [preselectedItem, preselectedGroup]);
+  
+  // Set initial selected soldier only when the prop changes
+  useEffect(() => {
+    if (preselectedSoldier) {
+      setSelectedSoldier(preselectedSoldier);
+    }
+  }, [preselectedSoldier]);
+
+  // Primary data loading function - only called once
+  useEffect(() => {
+    // Skip if already loaded
+    if (initialLoadCompleteRef.current) return;
+    
+    const loadAllData = async () => {
+      console.log('Starting initial data load...');
+      setLoading(true);
+      try {
+        // STEP 1: Load soldiers
+        console.log('Loading soldiers for UIC:', uicID);
+        const soldiersResponse = await client.graphql({
+          query: `query GetSoldiersByUIC($uicID: ID!) {
+            soldiersByUicID(uicID: $uicID) {
+              items {
+                id
+                firstName
+                lastName
+                rank
+                role
+                hasAccount
+              }
             }
-          ]
-        };
+          }`,
+          variables: { uicID },
+          headers: {
+            "Cache-Control": "no-cache",
+            "x-cache-buster": new Date().getTime().toString()
+          }
+        });
+        
+        const soldiersList = soldiersResponse.data.soldiersByUicID.items;
+        setSoldiers(soldiersList);
+        console.log('Loaded soldiers:', soldiersList.length);
+        
+        // STEP 2: Load equipment items based on filter
+        const filter = createFilter(showAssignedItems);
+        console.log('Loading equipment items with filter:', showAssignedItems ? 'showing assigned' : 'hiding assigned');
+        
+        const equipmentResponse = await client.graphql({
+          query: `query GetEquipmentItemsByUIC($uicID: ID!, $filter: ModelEquipmentItemFilterInput) {
+            equipmentItemsByUicID(uicID: $uicID, filter: $filter) {
+              items {
+                id
+                nsn
+                lin
+                serialNumber
+                stockNumber
+                location
+                equipmentMasterID
+                assignedToID
+                groupID
+                isPartOfGroup
+                maintenanceStatus
+                _version
+              }
+            }
+          }`,
+          variables: { uicID, filter },
+          headers: {
+            "Cache-Control": "no-cache",
+            "x-cache-buster": new Date().getTime().toString()
+          }
+        });
+        
+        const equipmentItems = equipmentResponse.data.equipmentItemsByUicID.items;
+        console.log(`Found ${equipmentItems.length} equipment items matching filter`);
+        
+        // Process items with master data
+        const itemsWithDetails = await Promise.all(
+          equipmentItems.map(async (item) => {
+            try {
+              const masterResponse = await client.graphql({
+                query: `query GetEquipmentMaster($id: ID!) {
+                  getEquipmentMaster(id: $id) {
+                    id
+                    nsn
+                    commonName
+                    imageKey
+                  }
+                }`,
+                variables: { id: item.equipmentMasterID }
+              });
+              
+              const masterData = masterResponse.data.getEquipmentMaster;
+              let imageUrl = null;
+              
+              if (masterData?.imageKey) {
+                try {
+                  const imageUrlResult = await getUrl({
+                    key: masterData.imageKey,
+                    options: { expiresIn: 3600 }
+                  });
+                  imageUrl = imageUrlResult.url.toString();
+                } catch (err) {
+                  console.error('Error getting image URL:', err);
+                }
+              }
+              
+              return {
+                ...item,
+                commonName: masterData?.commonName || `Item ${item.nsn}`,
+                imageUrl
+              };
+            } catch (error) {
+              console.error(`Error getting master data for item ${item.id}:`, error);
+              return {
+                ...item,
+                commonName: `Item ${item.nsn}`
+              };
+            }
+          })
+        );
+        
+        setEquipment(itemsWithDetails);
+        
+        // STEP 3: Load equipment groups
+        console.log('Loading equipment groups with filter:', showAssignedItems ? 'showing assigned' : 'hiding assigned');
+        
+        const groupsResponse = await client.graphql({
+          query: `query GetEquipmentGroupsByUIC($uicID: ID!, $filter: ModelEquipmentGroupFilterInput) {
+            equipmentGroupsByUicID(uicID: $uicID, filter: $filter) {
+              items {
+                id
+                name
+                description
+                assignedToID
+                _version
+              }
+            }
+          }`,
+          variables: { uicID, filter },
+          headers: {
+            "Cache-Control": "no-cache",
+            "x-cache-buster": new Date().getTime().toString()
+          }
+        });
+        
+        const groupsList = groupsResponse.data.equipmentGroupsByUicID.items;
+        console.log(`Found ${groupsList.length} equipment groups matching filter`);
+        
+        // Process groups with item counts
+        const groupsWithCounts = await Promise.all(
+          groupsList.map(async (group) => {
+            try {
+              const itemsResponse = await client.graphql({
+                query: `query CountItemsInGroup($groupID: ID!) {
+                  equipmentItemsByGroupID(groupID: $groupID) {
+                    items {
+                      id
+                    }
+                  }
+                }`,
+                variables: { groupID: group.id }
+              });
+              
+              const groupItems = itemsResponse.data.equipmentItemsByGroupID.items;
+              
+              return {
+                ...group,
+                itemCount: groupItems.length
+              };
+            } catch (error) {
+              console.error(`Error getting items for group ${group.id}:`, error);
+              return {
+                ...group,
+                itemCount: 0
+              };
+            }
+          })
+        );
+        
+        setGroups(groupsWithCounts);
+        console.log('Initial data load complete');
+        
+      } catch (error) {
+        console.error('Error in initial data load:', error);
+        setError('Failed to load data: ' + error.message);
+      } finally {
+        setLoading(false);
+        // Mark initial load as complete to prevent re-running
+        initialLoadCompleteRef.current = true;
       }
+    };
+    
+    loadAllData();
+  }, [uicID, initialShowAssigned]); // Stable dependencies that won't change during component lifecycle
+  
+  // Handle click outside dropdown to close it
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setDropdownOpen(false);
+      }
+    }
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  // Handle show assigned items toggle
+  const handleShowAssignedToggle = async (checked) => {
+    setShowAssignedItems(checked);
+    
+    // Reload data when the checkbox is manually toggled
+    setLoading(true);
+    
+    try {
+      console.log('Reloading data with filter changed to:', checked ? 'showing assigned' : 'hiding assigned');
+      const filter = createFilter(checked);
       
-      // Query for equipment items with filter
+      // Load equipment with new filter
       const equipmentResponse = await client.graphql({
         query: `query GetEquipmentItemsByUIC($uicID: ID!, $filter: ModelEquipmentItemFilterInput) {
-          equipmentItemsByUicID(
-            uicID: $uicID,
-            filter: $filter
-          ) {
+          equipmentItemsByUicID(uicID: $uicID, filter: $filter) {
             items {
               id
               nsn
@@ -132,101 +325,66 @@ function AssignmentModal({
             }
           }
         }`,
-        variables: { 
-          uicID,
-          filter: filter
+        variables: { uicID, filter },
+        headers: {
+          "Cache-Control": "no-cache",
+          "x-cache-buster": new Date().getTime().toString()
         }
       });
       
       const equipmentItems = equipmentResponse.data.equipmentItemsByUicID.items;
-      console.log(`Found ${equipmentItems.length} equipment items matching filter`);
+      console.log(`Reload found ${equipmentItems.length} equipment items matching filter`);
       
-      // Add master data to each item
-      const itemsWithDetails = await Promise.all(
-        equipmentItems.map(async (item) => {
-          try {
-            const masterResponse = await client.graphql({
-              query: `query GetEquipmentMaster($id: ID!) {
-                getEquipmentMaster(id: $id) {
-                  id
-                  nsn
-                  commonName
-                  imageKey
-                }
-              }`,
-              variables: { id: item.equipmentMasterID }
-            });
-            
-            const masterData = masterResponse.data.getEquipmentMaster;
-            
-            // Get image URL if available
-            let imageUrl = null;
-            if (masterData?.imageKey) {
-              try {
-                const imageUrlResult = await getUrl({
-                  key: masterData.imageKey,
-                  options: { expiresIn: 3600 }
-                });
-                imageUrl = imageUrlResult.url.toString();
-              } catch (err) {
-                console.error('Error getting image URL:', err);
+      // Process items with master data
+      const itemsWithDetails = await Promise.all(equipmentItems.map(async (item) => {
+        try {
+          const masterResponse = await client.graphql({
+            query: `query GetEquipmentMaster($id: ID!) {
+              getEquipmentMaster(id: $id) {
+                id
+                nsn
+                commonName
+                imageKey
               }
+            }`,
+            variables: { id: item.equipmentMasterID }
+          });
+          
+          const masterData = masterResponse.data.getEquipmentMaster;
+          let imageUrl = null;
+          
+          if (masterData?.imageKey) {
+            try {
+              const imageUrlResult = await getUrl({
+                key: masterData.imageKey,
+                options: { expiresIn: 3600 }
+              });
+              imageUrl = imageUrlResult.url.toString();
+            } catch (err) { 
+              console.error('Error getting image URL:', err); 
             }
-            
-            return {
-              ...item,
-              commonName: masterData?.commonName || `Item ${item.nsn}`,
-              imageUrl
-            };
-          } catch (error) {
-            console.error(`Error getting master data for item ${item.id}:`, error);
-            return {
-              ...item,
-              commonName: `Item ${item.nsn}`
-            };
           }
-        })
-      );
+          
+          return {
+            ...item,
+            commonName: masterData?.commonName || `Item ${item.nsn}`,
+            imageUrl
+          };
+        } catch (error) {
+          console.error(`Error getting master data for item ${item.id}:`, error);
+          return {
+            ...item,
+            commonName: `Item ${item.nsn}`
+          };
+        }
+      }));
       
       setEquipment(itemsWithDetails);
-      return itemsWithDetails;
-    } catch (error) {
-      console.error('Error loading equipment items:', error);
-      setError('Failed to load equipment items: ' + error.message);
-      return [];
-    }
-  }, [uicID, showAssignedItems, client]);
-
-  // Load groups with filter applied
-  const loadGroups = useCallback(async () => {
-    try {
-      console.log('Loading equipment groups for UIC:', uicID);
       
-      // Build filter based on showAssignedItems flag
-      let filter = { _deleted: { ne: true } };
-      
-      if (!showAssignedItems) {
-        // Filter for groups where assignedToID is either missing or null
-        filter = {
-          and: [
-            { _deleted: { ne: true } },
-            {
-              or: [
-                { assignedToID: { attributeExists: false } },
-                { assignedToID: { eq: null } }
-              ]
-            }
-          ]
-        };
-      }
-      
-      // Query for equipment groups with filter
+      // Load groups with new filter
       const groupsResponse = await client.graphql({
         query: `query GetEquipmentGroupsByUIC($uicID: ID!, $filter: ModelEquipmentGroupFilterInput) {
-          equipmentGroupsByUicID(
-            uicID: $uicID,
-            filter: $filter
-          ) {
+          equipmentGroupsByUicID(uicID: $uicID, filter: $filter) {
             items {
               id
               name
@@ -236,129 +394,60 @@ function AssignmentModal({
             }
           }
         }`,
-        variables: { 
-          uicID,
-          filter: filter
+        variables: { uicID, filter },
+        headers: {
+          "Cache-Control": "no-cache",
+          "x-cache-buster": new Date().getTime().toString()
         }
       });
       
       const groupsList = groupsResponse.data.equipmentGroupsByUicID.items;
-      console.log(`Found ${groupsList.length} equipment groups matching filter`);
+      console.log(`Reload found ${groupsList.length} equipment groups matching filter`);
       
-      // For each group, count the items
-      const groupsWithCounts = await Promise.all(
-        groupsList.map(async (group) => {
-          try {
-            const itemsResponse = await client.graphql({
-              query: `query CountItemsInGroup($groupID: ID!) {
-                equipmentItemsByGroupID(groupID: $groupID) {
-                  items {
-                    id
-                  }
+      // Process groups with item counts
+      const groupsWithCounts = await Promise.all(groupsList.map(async (group) => {
+        try {
+          const itemsResponse = await client.graphql({
+            query: `query CountItemsInGroup($groupID: ID!) {
+              equipmentItemsByGroupID(groupID: $groupID) {
+                items {
+                  id
                 }
-              }`,
-              variables: { groupID: group.id }
-            });
-            
-            const groupItems = itemsResponse.data.equipmentItemsByGroupID.items;
-            
-            return {
-              ...group,
-              itemCount: groupItems.length
-            };
-          } catch (error) {
-            console.error(`Error getting items for group ${group.id}:`, error);
-            return {
-              ...group,
-              itemCount: 0
-            };
-          }
-        })
-      );
+              }
+            }`,
+            variables: { groupID: group.id }
+          });
+          
+          const groupItems = itemsResponse.data.equipmentItemsByGroupID.items;
+          
+          return {
+            ...group,
+            itemCount: groupItems.length
+          };
+        } catch (error) {
+          console.error(`Error getting items for group ${group.id}:`, error);
+          return {
+            ...group,
+            itemCount: 0
+          };
+        }
+      }));
       
       setGroups(groupsWithCounts);
-      return groupsWithCounts;
+      console.log('Filter reload complete');
     } catch (error) {
-      console.error('Error loading equipment groups:', error);
-      setError('Failed to load equipment groups: ' + error.message);
-      return [];
+      console.error('Error reloading data on filter change:', error);
+      setError('Failed to reload data with new filter.');
+    } finally {
+      setLoading(false);
     }
-  }, [uicID, showAssignedItems, client]);
-
-  // Initial data load
-  useEffect(() => {
-    let isMounted = true; // Add mounted flag to prevent state updates after unmount
-    
-    const loadData = async () => {
-      setLoading(true);
-      try {
-        await loadSoldiers();
-        
-        // Store current filter state to avoid loops
-        const currentShowAssigned = showAssignedItems;
-        
-        // Load data sequentially to avoid parallel loads
-        await loadEquipment();
-        
-        // Only proceed to load groups if the component is still mounted
-        // and showAssignedItems hasn't changed during the equipment load
-        if (isMounted && currentShowAssigned === showAssignedItems) {
-          await loadGroups();
-        }
-      } catch (error) {
-        if (isMounted) {
-          console.error('Error loading initial data:', error);
-          setError('Failed to load data: ' + error.message);
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
-    
-    loadData();
-    
-    // Clean up function to prevent state updates after unmount
-    return () => {
-      isMounted = false;
-    };
-  }, []); // Empty dependency array - only run on mount
-
-  // Handle filter changes - Modified to fix infinite loop
-  useEffect(() => {
-    // Skip initial render
-    const handleFilterChange = async () => {
-      // Only reload if filterChanged flag is true
-      if (filterChanged) {
-        setLoading(true);
-        try {
-          // First load equipment
-          await loadEquipment();
-          // Then load groups
-          await loadGroups();
-        } catch (error) {
-          console.error('Error reloading filtered data:', error);
-        } finally {
-          setLoading(false);
-          // Reset the flag after reload
-          setFilterChanged(false);
-        }
-      }
-    };
-    
-    handleFilterChange();
-  }, [filterChanged]); // Only depend on filterChanged flag
-
-  // Handle show assigned items toggle
-  const handleShowAssignedToggle = (checked) => {
-    setShowAssignedItems(checked);
-    setFilterChanged(true); // Set flag to trigger data reload
   };
 
   // Handle soldier selection
   const handleSelectSoldier = (soldier) => {
     setSelectedSoldier(soldier);
+    setSoldierSearchTerm('');
+    setDropdownOpen(false);
     
     // If in "toEquipment" mode, reset equipment selections
     if (assignmentDirection === 'toEquipment') {
@@ -560,7 +649,6 @@ function AssignmentModal({
       // Reset selections and reload data
       setSelectedItems([]);
       setSelectedGroup(null);
-      setFilterChanged(true); // Trigger data reload
       
     } catch (error) {
       console.error('Error during assignment:', error);
@@ -684,7 +772,6 @@ function AssignmentModal({
       // Reset selections and reload data
       setSelectedItems([]);
       setSelectedGroup(null);
-      setFilterChanged(true); // Trigger data reload
       
     } catch (error) {
       console.error('Error during unassignment:', error);
@@ -694,7 +781,13 @@ function AssignmentModal({
     }
   };
 
-  // Return the component JSX - keeping the same UI structure
+  // Format soldier display name
+  const getSoldierDisplayName = (soldier) => {
+    if (!soldier) return '';
+    return `${soldier.rank || ''} ${soldier.lastName}, ${soldier.firstName}`.trim();
+  };
+
+  // Return the component JSX with updated UI for soldier selection
   return (
     <div className="modal-overlay">
       <div className="modal-content assignment-modal">
@@ -714,33 +807,59 @@ function AssignmentModal({
           <div className="loading">Loading data...</div>
         ) : (
           <div className="assignment-container">
-            {/* Soldier Selection Section */}
+            {/* Soldier Selection Section with Dropdown */}
             <div className="soldier-selection-section">
               <h3>Select Soldier</h3>
-              <div className="search-box">
-                <input
-                  type="text"
-                  placeholder="Search soldiers..."
-                  value={soldierSearchTerm}
-                  onChange={(e) => setSoldierSearchTerm(e.target.value)}
-                />
-              </div>
               
-              <div className="soldiers-list">
-                {filteredSoldiers.length === 0 ? (
-                  <p className="no-data-message">No soldiers found in this UIC.</p>
-                ) : (
-                  filteredSoldiers.map(soldier => (
-                    <div
-                      key={soldier.id}
-                      className={`soldier-card ${selectedSoldier?.id === soldier.id ? 'selected' : ''}`}
-                      onClick={() => handleSelectSoldier(soldier)}
-                    >
-                      <div className="soldier-name">
-                        {soldier.rank} {soldier.lastName}, {soldier.firstName}
-                      </div>
+              <div className="soldier-dropdown-container" ref={dropdownRef}>
+                <div 
+                  className="soldier-dropdown-header"
+                  onClick={() => setDropdownOpen(!dropdownOpen)}
+                >
+                  {selectedSoldier ? (
+                    <div className="selected-soldier">
+                      {getSoldierDisplayName(selectedSoldier)}
                     </div>
-                  ))
+                  ) : (
+                    <div className="soldier-placeholder">Select a soldier</div>
+                  )}
+                  <div className="dropdown-arrow">▼</div>
+                </div>
+                
+                {dropdownOpen && (
+                  <div className="soldier-dropdown-content">
+                    <input
+                      type="text"
+                      placeholder="Search soldiers..."
+                      value={soldierSearchTerm}
+                      onChange={(e) => setSoldierSearchTerm(e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="soldier-search-input"
+                    />
+                    
+                    <div className="soldier-dropdown-list">
+                      {filteredSoldiers.length === 0 ? (
+                        <div className="no-soldiers-message">
+                          {soldiers.length === 0 
+                            ? 'No soldiers found in this UIC.' 
+                            : 'No soldiers match your search.'}
+                        </div>
+                      ) : (
+                        filteredSoldiers.map(soldier => (
+                          <div
+                            key={soldier.id}
+                            className={`soldier-dropdown-item ${selectedSoldier?.id === soldier.id ? 'selected' : ''}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSelectSoldier(soldier);
+                            }}
+                          >
+                            {getSoldierDisplayName(soldier)}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
                 )}
               </div>
             </div>

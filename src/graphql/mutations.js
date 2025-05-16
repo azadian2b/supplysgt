@@ -40,6 +40,11 @@ export const createUIC = /* GraphQL */ `
         startedAt
         __typename
       }
+      accountabilitySessions {
+        nextToken
+        startedAt
+        __typename
+      }
       createdAt
       updatedAt
       _version
@@ -85,6 +90,11 @@ export const updateUIC = /* GraphQL */ `
         __typename
       }
       handReceiptStatuses {
+        nextToken
+        startedAt
+        __typename
+      }
+      accountabilitySessions {
         nextToken
         startedAt
         __typename
@@ -138,6 +148,11 @@ export const deleteUIC = /* GraphQL */ `
         startedAt
         __typename
       }
+      accountabilitySessions {
+        nextToken
+        startedAt
+        __typename
+      }
       createdAt
       updatedAt
       _version
@@ -180,6 +195,16 @@ export const createUser = /* GraphQL */ `
       }
       linkedSoldierId
       soldiersLinked {
+        nextToken
+        startedAt
+        __typename
+      }
+      conductedSessions {
+        nextToken
+        startedAt
+        __typename
+      }
+      verifiedItems {
         nextToken
         startedAt
         __typename
@@ -229,6 +254,16 @@ export const updateUser = /* GraphQL */ `
         startedAt
         __typename
       }
+      conductedSessions {
+        nextToken
+        startedAt
+        __typename
+      }
+      verifiedItems {
+        nextToken
+        startedAt
+        __typename
+      }
       createdAt
       updatedAt
       _version
@@ -270,6 +305,16 @@ export const deleteUser = /* GraphQL */ `
       }
       linkedSoldierId
       soldiersLinked {
+        nextToken
+        startedAt
+        __typename
+      }
+      conductedSessions {
+        nextToken
+        startedAt
+        __typename
+      }
+      verifiedItems {
         nextToken
         startedAt
         __typename
@@ -821,6 +866,11 @@ export const createEquipmentItem = /* GraphQL */ `
         startedAt
         __typename
       }
+      accountabilityItems {
+        nextToken
+        startedAt
+        __typename
+      }
       createdAt
       updatedAt
       _version
@@ -918,6 +968,11 @@ export const updateEquipmentItem = /* GraphQL */ `
         startedAt
         __typename
       }
+      accountabilityItems {
+        nextToken
+        startedAt
+        __typename
+      }
       createdAt
       updatedAt
       _version
@@ -1011,6 +1066,11 @@ export const deleteEquipmentItem = /* GraphQL */ `
         __typename
       }
       handReceiptStatuses {
+        nextToken
+        startedAt
+        __typename
+      }
+      accountabilityItems {
         nextToken
         startedAt
         __typename
@@ -1402,6 +1462,405 @@ export const deleteHandReceiptStatus = /* GraphQL */ `
       issuedOn
       returnedOn
       pdfS3Key
+      createdAt
+      updatedAt
+      _version
+      _deleted
+      _lastChangedAt
+      __typename
+    }
+  }
+`;
+export const createAccountabilitySession = /* GraphQL */ `
+  mutation CreateAccountabilitySession(
+    $input: CreateAccountabilitySessionInput!
+    $condition: ModelAccountabilitySessionConditionInput
+  ) {
+    createAccountabilitySession(input: $input, condition: $condition) {
+      id
+      uicID
+      uic {
+        id
+        uicCode
+        name
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        owner
+        __typename
+      }
+      conductedByID
+      conductedBy {
+        id
+        owner
+        firstName
+        lastName
+        rank
+        role
+        uicID
+        linkedSoldierId
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        __typename
+      }
+      status
+      startedAt
+      completedAt
+      itemCount
+      accountedForCount
+      accountabilityItems {
+        nextToken
+        startedAt
+        __typename
+      }
+      createdAt
+      updatedAt
+      _version
+      _deleted
+      _lastChangedAt
+      __typename
+    }
+  }
+`;
+export const updateAccountabilitySession = /* GraphQL */ `
+  mutation UpdateAccountabilitySession(
+    $input: UpdateAccountabilitySessionInput!
+    $condition: ModelAccountabilitySessionConditionInput
+  ) {
+    updateAccountabilitySession(input: $input, condition: $condition) {
+      id
+      uicID
+      uic {
+        id
+        uicCode
+        name
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        owner
+        __typename
+      }
+      conductedByID
+      conductedBy {
+        id
+        owner
+        firstName
+        lastName
+        rank
+        role
+        uicID
+        linkedSoldierId
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        __typename
+      }
+      status
+      startedAt
+      completedAt
+      itemCount
+      accountedForCount
+      accountabilityItems {
+        nextToken
+        startedAt
+        __typename
+      }
+      createdAt
+      updatedAt
+      _version
+      _deleted
+      _lastChangedAt
+      __typename
+    }
+  }
+`;
+export const deleteAccountabilitySession = /* GraphQL */ `
+  mutation DeleteAccountabilitySession(
+    $input: DeleteAccountabilitySessionInput!
+    $condition: ModelAccountabilitySessionConditionInput
+  ) {
+    deleteAccountabilitySession(input: $input, condition: $condition) {
+      id
+      uicID
+      uic {
+        id
+        uicCode
+        name
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        owner
+        __typename
+      }
+      conductedByID
+      conductedBy {
+        id
+        owner
+        firstName
+        lastName
+        rank
+        role
+        uicID
+        linkedSoldierId
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        __typename
+      }
+      status
+      startedAt
+      completedAt
+      itemCount
+      accountedForCount
+      accountabilityItems {
+        nextToken
+        startedAt
+        __typename
+      }
+      createdAt
+      updatedAt
+      _version
+      _deleted
+      _lastChangedAt
+      __typename
+    }
+  }
+`;
+export const createAccountabilityItem = /* GraphQL */ `
+  mutation CreateAccountabilityItem(
+    $input: CreateAccountabilityItemInput!
+    $condition: ModelAccountabilityItemConditionInput
+  ) {
+    createAccountabilityItem(input: $input, condition: $condition) {
+      id
+      sessionID
+      session {
+        id
+        uicID
+        conductedByID
+        status
+        startedAt
+        completedAt
+        itemCount
+        accountedForCount
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        __typename
+      }
+      equipmentItemID
+      equipmentItem {
+        id
+        uicID
+        equipmentMasterID
+        nsn
+        lin
+        serialNumber
+        stockNumber
+        location
+        assignedToID
+        maintenanceStatus
+        isPartOfGroup
+        groupID
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        __typename
+      }
+      status
+      verificationMethod
+      verifiedByID
+      verifiedBy {
+        id
+        owner
+        firstName
+        lastName
+        rank
+        role
+        uicID
+        linkedSoldierId
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        __typename
+      }
+      verifiedAt
+      confirmationStatus
+      confirmedAt
+      notes
+      createdAt
+      updatedAt
+      _version
+      _deleted
+      _lastChangedAt
+      __typename
+    }
+  }
+`;
+export const updateAccountabilityItem = /* GraphQL */ `
+  mutation UpdateAccountabilityItem(
+    $input: UpdateAccountabilityItemInput!
+    $condition: ModelAccountabilityItemConditionInput
+  ) {
+    updateAccountabilityItem(input: $input, condition: $condition) {
+      id
+      sessionID
+      session {
+        id
+        uicID
+        conductedByID
+        status
+        startedAt
+        completedAt
+        itemCount
+        accountedForCount
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        __typename
+      }
+      equipmentItemID
+      equipmentItem {
+        id
+        uicID
+        equipmentMasterID
+        nsn
+        lin
+        serialNumber
+        stockNumber
+        location
+        assignedToID
+        maintenanceStatus
+        isPartOfGroup
+        groupID
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        __typename
+      }
+      status
+      verificationMethod
+      verifiedByID
+      verifiedBy {
+        id
+        owner
+        firstName
+        lastName
+        rank
+        role
+        uicID
+        linkedSoldierId
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        __typename
+      }
+      verifiedAt
+      confirmationStatus
+      confirmedAt
+      notes
+      createdAt
+      updatedAt
+      _version
+      _deleted
+      _lastChangedAt
+      __typename
+    }
+  }
+`;
+export const deleteAccountabilityItem = /* GraphQL */ `
+  mutation DeleteAccountabilityItem(
+    $input: DeleteAccountabilityItemInput!
+    $condition: ModelAccountabilityItemConditionInput
+  ) {
+    deleteAccountabilityItem(input: $input, condition: $condition) {
+      id
+      sessionID
+      session {
+        id
+        uicID
+        conductedByID
+        status
+        startedAt
+        completedAt
+        itemCount
+        accountedForCount
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        __typename
+      }
+      equipmentItemID
+      equipmentItem {
+        id
+        uicID
+        equipmentMasterID
+        nsn
+        lin
+        serialNumber
+        stockNumber
+        location
+        assignedToID
+        maintenanceStatus
+        isPartOfGroup
+        groupID
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        __typename
+      }
+      status
+      verificationMethod
+      verifiedByID
+      verifiedBy {
+        id
+        owner
+        firstName
+        lastName
+        rank
+        role
+        uicID
+        linkedSoldierId
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        __typename
+      }
+      verifiedAt
+      confirmationStatus
+      confirmedAt
+      notes
       createdAt
       updatedAt
       _version

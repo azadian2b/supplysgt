@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { generateClient } from 'aws-amplify/api';
 import { getCurrentUser } from 'aws-amplify/auth';
 import { deleteEquipmentItem, updateEquipmentItem } from '../../graphql/mutations';
 import { DataStore } from '@aws-amplify/datastore';
 import DataStoreUtil from '../../utils/DataStoreSync';
 import DataInspector from '../../utils/DataInspector';
+import AssignmentModal from '../assignment/AssignmentModal';
 import './Equipment.css';
+import './InventoryStyles.css';
 
 function InventoryList({ onBack }) {
   const [inventory, setInventory] = useState([]);
@@ -26,6 +28,16 @@ function InventoryList({ onBack }) {
   const [showOrphanedItemsModal, setShowOrphanedItemsModal] = useState(false);
   const [orphanedItems, setOrphanedItems] = useState([]);
   const [processingOrphans, setProcessingOrphans] = useState(false);
+  
+  // Assignment Modal state
+  const [showAssignmentModal, setShowAssignmentModal] = useState(false);
+  const [itemToAssign, setItemToAssign] = useState(null);
+  
+  const [openActionMenuId, setOpenActionMenuId] = useState(null); // State to track open menu
+  
+  // Ref for detecting clicks outside the action menu
+  const actionMenuRef = useRef(null);
+  
   const client = generateClient();
 
   // Effect to clear messages after a timeout
@@ -1130,6 +1142,74 @@ function InventoryList({ onBack }) {
     }
   };
 
+  // Add this new function to handle opening the AssignmentModal with preselected item
+  const handleOpenAssignmentModal = async (item) => {
+    try {
+      setLoading(true);
+      
+      // If the item is part of a group, we need to preselect the group
+      if (item.isPartOfGroup && item.groupID) {
+        // Get the group details
+        const groupResponse = await client.graphql({
+          query: `query GetEquipmentGroup($id: ID!) {
+            getEquipmentGroup(id: $id) {
+              id
+              name
+              description
+              assignedToID
+              _version
+            }
+          }`,
+          variables: { id: item.groupID }
+        });
+        
+        const groupData = groupResponse.data.getEquipmentGroup;
+        
+        if (groupData) {
+          // Set the item to assign with group information
+          setItemToAssign({
+            ...item,
+            group: groupData
+          });
+        } else {
+          // Group not found (might be deleted), just use the item
+          setItemToAssign(item);
+        }
+      } else {
+        // Not part of a group, just use the item
+        setItemToAssign(item);
+      }
+      
+      // Enable the modal after data is loaded
+      setShowAssignmentModal(true);
+    } catch (error) {
+      console.error('Error preparing for assignment:', error);
+      setError('Failed to prepare item for assignment. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Handle completing assignment
+  const handleAssignmentComplete = async () => {
+    // Refresh the inventory list to show updated assignments
+    try {
+      if (isOnlineMode) {
+        await fetchDirectFromAPI();
+      } else {
+        await fetchFromLocalDataStore();
+      }
+      setSuccess('Assignment updated successfully.');
+    } catch (error) {
+      console.error('Error refreshing inventory after assignment:', error);
+    }
+  };
+
+  // Toggle action menu for a specific item
+  const toggleActionMenu = (itemId) => {
+    setOpenActionMenuId(prevId => (prevId === itemId ? null : itemId));
+  };
+
   return (
     <div className="inventory-container">
       <div className="inventory-header">
@@ -1281,10 +1361,46 @@ function InventoryList({ onBack }) {
                   <td>{item.location || '-'}</td>
                   <td>{item.assignedToName || (item.assignedToID ? `ID: ${item.assignedToID}` : '-')}</td>
                   <td>{item.maintenanceStatus || 'OPERATIONAL'}</td>
-                  <td className="action-buttons">
-                    <button onClick={() => handleEditItem(item)}>Edit</button>
-                    <button onClick={() => handleDeleteItem(item.id)}>Delete</button>
-                    <button onClick={() => handleAssignToUser(item)}>Assign</button>
+                  <td className="action-cell">
+                    <div className="action-button-container">
+                      <button 
+                        className="action-menu-button" 
+                        onClick={() => toggleActionMenu(item.id)}
+                      >
+                        ...
+                      </button>
+                      {openActionMenuId === item.id && (
+                        <div className="action-menu" ref={actionMenuRef}>
+                          <button 
+                            className="action-menu-item assign-item"
+                            onClick={() => {
+                              handleOpenAssignmentModal(item);
+                              setOpenActionMenuId(null); // Close menu after click
+                            }}
+                          >
+                            Assign
+                          </button>
+                          <button 
+                            className="action-menu-item delete-item"
+                            onClick={() => {
+                              handleDeleteItem(item.id);
+                              setOpenActionMenuId(null); // Close menu after click
+                            }}
+                          >
+                            Delete
+                          </button>
+                          <button 
+                            className="action-menu-item edit-item"
+                            onClick={() => {
+                              handleEditItem(item);
+                              setOpenActionMenuId(null); // Close menu after click
+                            }}
+                          >
+                            Edit
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -1409,6 +1525,22 @@ function InventoryList({ onBack }) {
         </div>
       )}
       
+      {/* Assignment Modal */}
+      {showAssignmentModal && itemToAssign && (
+        <AssignmentModal
+          onClose={() => {
+            setShowAssignmentModal(false);
+            setItemToAssign(null);
+          }}
+          uicID={uicID}
+          preselectedItem={itemToAssign.group ? null : itemToAssign}
+          preselectedGroup={itemToAssign.group}
+          preselectedSoldier={null}
+          onAssignmentComplete={handleAssignmentComplete}
+        />
+      )}
+      
+      {/* Edit Item Modal */}
       {editItem && (
         <div className="modal-overlay">
           <div className="modal-content">

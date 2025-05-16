@@ -40,6 +40,11 @@ export const onCreateUIC = /* GraphQL */ `
         startedAt
         __typename
       }
+      accountabilitySessions {
+        nextToken
+        startedAt
+        __typename
+      }
       createdAt
       updatedAt
       _version
@@ -85,6 +90,11 @@ export const onUpdateUIC = /* GraphQL */ `
         __typename
       }
       handReceiptStatuses {
+        nextToken
+        startedAt
+        __typename
+      }
+      accountabilitySessions {
         nextToken
         startedAt
         __typename
@@ -138,6 +148,11 @@ export const onDeleteUIC = /* GraphQL */ `
         startedAt
         __typename
       }
+      accountabilitySessions {
+        nextToken
+        startedAt
+        __typename
+      }
       createdAt
       updatedAt
       _version
@@ -180,6 +195,16 @@ export const onCreateUser = /* GraphQL */ `
       }
       linkedSoldierId
       soldiersLinked {
+        nextToken
+        startedAt
+        __typename
+      }
+      conductedSessions {
+        nextToken
+        startedAt
+        __typename
+      }
+      verifiedItems {
         nextToken
         startedAt
         __typename
@@ -229,6 +254,16 @@ export const onUpdateUser = /* GraphQL */ `
         startedAt
         __typename
       }
+      conductedSessions {
+        nextToken
+        startedAt
+        __typename
+      }
+      verifiedItems {
+        nextToken
+        startedAt
+        __typename
+      }
       createdAt
       updatedAt
       _version
@@ -270,6 +305,16 @@ export const onDeleteUser = /* GraphQL */ `
       }
       linkedSoldierId
       soldiersLinked {
+        nextToken
+        startedAt
+        __typename
+      }
+      conductedSessions {
+        nextToken
+        startedAt
+        __typename
+      }
+      verifiedItems {
         nextToken
         startedAt
         __typename
@@ -817,6 +862,11 @@ export const onCreateEquipmentItem = /* GraphQL */ `
         startedAt
         __typename
       }
+      accountabilityItems {
+        nextToken
+        startedAt
+        __typename
+      }
       createdAt
       updatedAt
       _version
@@ -913,6 +963,11 @@ export const onUpdateEquipmentItem = /* GraphQL */ `
         startedAt
         __typename
       }
+      accountabilityItems {
+        nextToken
+        startedAt
+        __typename
+      }
       createdAt
       updatedAt
       _version
@@ -1005,6 +1060,11 @@ export const onDeleteEquipmentItem = /* GraphQL */ `
         __typename
       }
       handReceiptStatuses {
+        nextToken
+        startedAt
+        __typename
+      }
+      accountabilityItems {
         nextToken
         startedAt
         __typename
@@ -1390,6 +1450,399 @@ export const onDeleteHandReceiptStatus = /* GraphQL */ `
       issuedOn
       returnedOn
       pdfS3Key
+      createdAt
+      updatedAt
+      _version
+      _deleted
+      _lastChangedAt
+      __typename
+    }
+  }
+`;
+export const onCreateAccountabilitySession = /* GraphQL */ `
+  subscription OnCreateAccountabilitySession(
+    $filter: ModelSubscriptionAccountabilitySessionFilterInput
+  ) {
+    onCreateAccountabilitySession(filter: $filter) {
+      id
+      uicID
+      uic {
+        id
+        uicCode
+        name
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        owner
+        __typename
+      }
+      conductedByID
+      conductedBy {
+        id
+        owner
+        firstName
+        lastName
+        rank
+        role
+        uicID
+        linkedSoldierId
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        __typename
+      }
+      status
+      startedAt
+      completedAt
+      itemCount
+      accountedForCount
+      accountabilityItems {
+        nextToken
+        startedAt
+        __typename
+      }
+      createdAt
+      updatedAt
+      _version
+      _deleted
+      _lastChangedAt
+      __typename
+    }
+  }
+`;
+export const onUpdateAccountabilitySession = /* GraphQL */ `
+  subscription OnUpdateAccountabilitySession(
+    $filter: ModelSubscriptionAccountabilitySessionFilterInput
+  ) {
+    onUpdateAccountabilitySession(filter: $filter) {
+      id
+      uicID
+      uic {
+        id
+        uicCode
+        name
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        owner
+        __typename
+      }
+      conductedByID
+      conductedBy {
+        id
+        owner
+        firstName
+        lastName
+        rank
+        role
+        uicID
+        linkedSoldierId
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        __typename
+      }
+      status
+      startedAt
+      completedAt
+      itemCount
+      accountedForCount
+      accountabilityItems {
+        nextToken
+        startedAt
+        __typename
+      }
+      createdAt
+      updatedAt
+      _version
+      _deleted
+      _lastChangedAt
+      __typename
+    }
+  }
+`;
+export const onDeleteAccountabilitySession = /* GraphQL */ `
+  subscription OnDeleteAccountabilitySession(
+    $filter: ModelSubscriptionAccountabilitySessionFilterInput
+  ) {
+    onDeleteAccountabilitySession(filter: $filter) {
+      id
+      uicID
+      uic {
+        id
+        uicCode
+        name
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        owner
+        __typename
+      }
+      conductedByID
+      conductedBy {
+        id
+        owner
+        firstName
+        lastName
+        rank
+        role
+        uicID
+        linkedSoldierId
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        __typename
+      }
+      status
+      startedAt
+      completedAt
+      itemCount
+      accountedForCount
+      accountabilityItems {
+        nextToken
+        startedAt
+        __typename
+      }
+      createdAt
+      updatedAt
+      _version
+      _deleted
+      _lastChangedAt
+      __typename
+    }
+  }
+`;
+export const onCreateAccountabilityItem = /* GraphQL */ `
+  subscription OnCreateAccountabilityItem(
+    $filter: ModelSubscriptionAccountabilityItemFilterInput
+  ) {
+    onCreateAccountabilityItem(filter: $filter) {
+      id
+      sessionID
+      session {
+        id
+        uicID
+        conductedByID
+        status
+        startedAt
+        completedAt
+        itemCount
+        accountedForCount
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        __typename
+      }
+      equipmentItemID
+      equipmentItem {
+        id
+        uicID
+        equipmentMasterID
+        nsn
+        lin
+        serialNumber
+        stockNumber
+        location
+        assignedToID
+        maintenanceStatus
+        isPartOfGroup
+        groupID
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        __typename
+      }
+      status
+      verificationMethod
+      verifiedByID
+      verifiedBy {
+        id
+        owner
+        firstName
+        lastName
+        rank
+        role
+        uicID
+        linkedSoldierId
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        __typename
+      }
+      verifiedAt
+      confirmationStatus
+      confirmedAt
+      notes
+      createdAt
+      updatedAt
+      _version
+      _deleted
+      _lastChangedAt
+      __typename
+    }
+  }
+`;
+export const onUpdateAccountabilityItem = /* GraphQL */ `
+  subscription OnUpdateAccountabilityItem(
+    $filter: ModelSubscriptionAccountabilityItemFilterInput
+  ) {
+    onUpdateAccountabilityItem(filter: $filter) {
+      id
+      sessionID
+      session {
+        id
+        uicID
+        conductedByID
+        status
+        startedAt
+        completedAt
+        itemCount
+        accountedForCount
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        __typename
+      }
+      equipmentItemID
+      equipmentItem {
+        id
+        uicID
+        equipmentMasterID
+        nsn
+        lin
+        serialNumber
+        stockNumber
+        location
+        assignedToID
+        maintenanceStatus
+        isPartOfGroup
+        groupID
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        __typename
+      }
+      status
+      verificationMethod
+      verifiedByID
+      verifiedBy {
+        id
+        owner
+        firstName
+        lastName
+        rank
+        role
+        uicID
+        linkedSoldierId
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        __typename
+      }
+      verifiedAt
+      confirmationStatus
+      confirmedAt
+      notes
+      createdAt
+      updatedAt
+      _version
+      _deleted
+      _lastChangedAt
+      __typename
+    }
+  }
+`;
+export const onDeleteAccountabilityItem = /* GraphQL */ `
+  subscription OnDeleteAccountabilityItem(
+    $filter: ModelSubscriptionAccountabilityItemFilterInput
+  ) {
+    onDeleteAccountabilityItem(filter: $filter) {
+      id
+      sessionID
+      session {
+        id
+        uicID
+        conductedByID
+        status
+        startedAt
+        completedAt
+        itemCount
+        accountedForCount
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        __typename
+      }
+      equipmentItemID
+      equipmentItem {
+        id
+        uicID
+        equipmentMasterID
+        nsn
+        lin
+        serialNumber
+        stockNumber
+        location
+        assignedToID
+        maintenanceStatus
+        isPartOfGroup
+        groupID
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        __typename
+      }
+      status
+      verificationMethod
+      verifiedByID
+      verifiedBy {
+        id
+        owner
+        firstName
+        lastName
+        rank
+        role
+        uicID
+        linkedSoldierId
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        __typename
+      }
+      verifiedAt
+      confirmationStatus
+      confirmedAt
+      notes
       createdAt
       updatedAt
       _version

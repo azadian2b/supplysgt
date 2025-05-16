@@ -1,0 +1,139 @@
+/* Improved styles for Personnel Roster */
+
+/* Table styles */
+.roster-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed; /* Fixed table layout for better overflow handling */
+}
+
+.roster-table th,
+.roster-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border-color);
+  text-align: left;
+  height: 2.5em; /* Fixed height for rows */
+  line-height: 1.2;
+  font-size: 0.9rem;
+}
+
+.roster-table th {
+  background-color: var(--background-color-secondary);
+  white-space: nowrap;
+}
+
+.roster-table td {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 150px; /* Set a maximum width for cells */
+}
+
+.roster-table tr:hover td {
+  background-color: rgba(40, 44, 52, 0.05);
+}
+
+/* Action buttons column should not be truncated */
+.roster-table td .action-buttons {
+  white-space: normal;
+  width: 240px; /* Fixed width for action buttons column */
+}
+
+/* Common style for action buttons */
+.action-buttons button {
+  padding: 5px 10px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: background-color 0.2s ease;
+  margin: 2px;
+}
+
+/* Edit button */
+.edit-btn {
+  background-color: #282c34 !important;
+  color: white !important;
+}
+
+.edit-btn:hover {
+  background-color: #1e2228 !important;
+}
+
+/* Delete button */
+.delete-btn {
+  background-color: #6c778d !important;
+  color: white !important;
+}
+
+.delete-btn:hover {
+  background-color: #5a6476 !important;
+}
+
+/* Assign button */
+.assign-btn {
+  background-color: #282c34 !important;
+  color: white !important;
+}
+
+.assign-btn:hover {
+  background-color: #1e2228 !important;
+}
+
+/* Make the table more responsive */
+@media (max-width: 768px) {
+  .roster-table td {
+    max-width: 100px;
+  }
+  
+  .roster-table td .action-buttons {
+    width: auto;
+  }
+  
+  .action-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  
+  .action-buttons button {
+    width: 100%;
+  }
+}
+
+/* Column width specifications */
+.roster-table th:nth-child(1),
+.roster-table td:nth-child(1) {
+  width: 15%; /* Last Name */
+}
+
+.roster-table th:nth-child(2),
+.roster-table td:nth-child(2) {
+  width: 15%; /* First Name */
+}
+
+.roster-table th:nth-child(3),
+.roster-table td:nth-child(3) {
+  width: 10%; /* Rank */
+}
+
+.roster-table th:nth-child(4),
+.roster-table td:nth-child(4) {
+  width: 15%; /* Role */
+}
+
+.roster-table th:nth-child(5),
+.roster-table td:nth-child(5) {
+  width: 15%; /* Account Status */
+}
+
+.roster-table th:nth-child(6),
+.roster-table td:nth-child(6) {
+  width: 30%; /* Actions */
+}
+
+/* Make table container responsive with horizontal scroll on small screens */
+.soldier-roster {
+  overflow-x: auto;
+  width: 100%;
+} 

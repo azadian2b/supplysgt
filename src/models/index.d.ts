@@ -22,6 +22,29 @@ export enum HandReceiptStatusType {
   RETURNED = "RETURNED"
 }
 
+export enum SessionStatus {
+  ACTIVE = "ACTIVE",
+  COMPLETED = "COMPLETED",
+  CANCELLED = "CANCELLED"
+}
+
+export enum ItemStatus {
+  ACCOUNTED_FOR = "ACCOUNTED_FOR",
+  NOT_ACCOUNTED_FOR = "NOT_ACCOUNTED_FOR",
+  VERIFICATION_PENDING = "VERIFICATION_PENDING"
+}
+
+export enum VerificationMethod {
+  DIRECT = "DIRECT",
+  SELF_SERVICE = "SELF_SERVICE"
+}
+
+export enum ConfirmationStatus {
+  PENDING = "PENDING",
+  CONFIRMED = "CONFIRMED",
+  FAILED = "FAILED"
+}
+
 export enum MaintenanceStatus {
   OPERATIONAL = "OPERATIONAL",
   MAINTENANCE_REQUIRED = "MAINTENANCE_REQUIRED",
@@ -46,6 +69,7 @@ type EagerUIC = {
   readonly equipmentItems?: (EquipmentItem | null)[] | null;
   readonly equipmentGroups?: (EquipmentGroup | null)[] | null;
   readonly handReceiptStatuses?: (HandReceiptStatus | null)[] | null;
+  readonly accountabilitySessions?: (AccountabilitySession | null)[] | null;
   readonly createdAt?: string | null;
   readonly updatedAt?: string | null;
 }
@@ -64,6 +88,7 @@ type LazyUIC = {
   readonly equipmentItems: AsyncCollection<EquipmentItem>;
   readonly equipmentGroups: AsyncCollection<EquipmentGroup>;
   readonly handReceiptStatuses: AsyncCollection<HandReceiptStatus>;
+  readonly accountabilitySessions: AsyncCollection<AccountabilitySession>;
   readonly createdAt?: string | null;
   readonly updatedAt?: string | null;
 }
@@ -90,6 +115,8 @@ type EagerUser = {
   readonly membershipRequests?: (UICMembershipRequest | null)[] | null;
   readonly linkedSoldierId?: string | null;
   readonly soldiersLinked?: (Soldier | null)[] | null;
+  readonly conductedSessions?: (AccountabilitySession | null)[] | null;
+  readonly verifiedItems?: (AccountabilityItem | null)[] | null;
   readonly createdAt?: string | null;
   readonly updatedAt?: string | null;
 }
@@ -110,6 +137,8 @@ type LazyUser = {
   readonly membershipRequests: AsyncCollection<UICMembershipRequest>;
   readonly linkedSoldierId?: string | null;
   readonly soldiersLinked: AsyncCollection<Soldier>;
+  readonly conductedSessions: AsyncCollection<AccountabilitySession>;
+  readonly verifiedItems: AsyncCollection<AccountabilityItem>;
   readonly createdAt?: string | null;
   readonly updatedAt?: string | null;
 }
@@ -285,6 +314,7 @@ type EagerEquipmentItem = {
   readonly groupID?: string | null;
   readonly equipmentGroup?: EquipmentGroup | null;
   readonly handReceiptStatuses?: (HandReceiptStatus | null)[] | null;
+  readonly accountabilityItems?: (AccountabilityItem | null)[] | null;
   readonly createdAt: string;
   readonly updatedAt: string;
 }
@@ -310,6 +340,7 @@ type LazyEquipmentItem = {
   readonly groupID?: string | null;
   readonly equipmentGroup: AsyncItem<EquipmentGroup | undefined>;
   readonly handReceiptStatuses: AsyncCollection<HandReceiptStatus>;
+  readonly accountabilityItems: AsyncCollection<AccountabilityItem>;
   readonly createdAt: string;
   readonly updatedAt: string;
 }
@@ -402,4 +433,96 @@ export declare type HandReceiptStatus = LazyLoading extends LazyLoadingDisabled 
 
 export declare const HandReceiptStatus: (new (init: ModelInit<HandReceiptStatus>) => HandReceiptStatus) & {
   copyOf(source: HandReceiptStatus, mutator: (draft: MutableModel<HandReceiptStatus>) => MutableModel<HandReceiptStatus> | void): HandReceiptStatus;
+}
+
+type EagerAccountabilitySession = {
+  readonly [__modelMeta__]: {
+    identifier: ManagedIdentifier<AccountabilitySession, 'id'>;
+  };
+  readonly id: string;
+  readonly uicID: string;
+  readonly uic?: UIC | null;
+  readonly conductedByID: string;
+  readonly conductedBy?: User | null;
+  readonly status: SessionStatus | keyof typeof SessionStatus;
+  readonly startedAt: string;
+  readonly completedAt?: string | null;
+  readonly itemCount: number;
+  readonly accountedForCount: number;
+  readonly accountabilityItems?: (AccountabilityItem | null)[] | null;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+type LazyAccountabilitySession = {
+  readonly [__modelMeta__]: {
+    identifier: ManagedIdentifier<AccountabilitySession, 'id'>;
+  };
+  readonly id: string;
+  readonly uicID: string;
+  readonly uic: AsyncItem<UIC | undefined>;
+  readonly conductedByID: string;
+  readonly conductedBy: AsyncItem<User | undefined>;
+  readonly status: SessionStatus | keyof typeof SessionStatus;
+  readonly startedAt: string;
+  readonly completedAt?: string | null;
+  readonly itemCount: number;
+  readonly accountedForCount: number;
+  readonly accountabilityItems: AsyncCollection<AccountabilityItem>;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+export declare type AccountabilitySession = LazyLoading extends LazyLoadingDisabled ? EagerAccountabilitySession : LazyAccountabilitySession
+
+export declare const AccountabilitySession: (new (init: ModelInit<AccountabilitySession>) => AccountabilitySession) & {
+  copyOf(source: AccountabilitySession, mutator: (draft: MutableModel<AccountabilitySession>) => MutableModel<AccountabilitySession> | void): AccountabilitySession;
+}
+
+type EagerAccountabilityItem = {
+  readonly [__modelMeta__]: {
+    identifier: ManagedIdentifier<AccountabilityItem, 'id'>;
+  };
+  readonly id: string;
+  readonly sessionID: string;
+  readonly session?: AccountabilitySession | null;
+  readonly equipmentItemID: string;
+  readonly equipmentItem?: EquipmentItem | null;
+  readonly status: ItemStatus | keyof typeof ItemStatus;
+  readonly verificationMethod: VerificationMethod | keyof typeof VerificationMethod;
+  readonly verifiedByID?: string | null;
+  readonly verifiedBy?: User | null;
+  readonly verifiedAt?: string | null;
+  readonly confirmationStatus?: ConfirmationStatus | keyof typeof ConfirmationStatus | null;
+  readonly confirmedAt?: string | null;
+  readonly notes?: string | null;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+type LazyAccountabilityItem = {
+  readonly [__modelMeta__]: {
+    identifier: ManagedIdentifier<AccountabilityItem, 'id'>;
+  };
+  readonly id: string;
+  readonly sessionID: string;
+  readonly session: AsyncItem<AccountabilitySession | undefined>;
+  readonly equipmentItemID: string;
+  readonly equipmentItem: AsyncItem<EquipmentItem | undefined>;
+  readonly status: ItemStatus | keyof typeof ItemStatus;
+  readonly verificationMethod: VerificationMethod | keyof typeof VerificationMethod;
+  readonly verifiedByID?: string | null;
+  readonly verifiedBy: AsyncItem<User | undefined>;
+  readonly verifiedAt?: string | null;
+  readonly confirmationStatus?: ConfirmationStatus | keyof typeof ConfirmationStatus | null;
+  readonly confirmedAt?: string | null;
+  readonly notes?: string | null;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+export declare type AccountabilityItem = LazyLoading extends LazyLoadingDisabled ? EagerAccountabilityItem : LazyAccountabilityItem
+
+export declare const AccountabilityItem: (new (init: ModelInit<AccountabilityItem>) => AccountabilityItem) & {
+  copyOf(source: AccountabilityItem, mutator: (draft: MutableModel<AccountabilityItem>) => MutableModel<AccountabilityItem> | void): AccountabilityItem;
 }

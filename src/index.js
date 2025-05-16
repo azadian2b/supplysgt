@@ -8,6 +8,7 @@ import { fetchAuthSession, getCurrentUser } from 'aws-amplify/auth';
 import { DataStore } from '@aws-amplify/datastore';
 import { User, UIC, UICMembershipRequest } from './models';
 import awsconfig from './aws-exports';
+import { initializeDataStore, setupAuthListener } from './utils/DataSyncManager';
 
 // Configure Amplify
 Amplify.configure(awsconfig);
@@ -29,6 +30,14 @@ DataStore.configure({
     ])
   }
 });
+
+// Initialize our data sync manager
+initializeDataStore().catch(error => {
+  console.error('Failed to initialize DataStore:', error);
+});
+
+// Set up auth listener for sign-in/sign-out events
+setupAuthListener();
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(

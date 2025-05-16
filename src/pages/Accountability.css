@@ -1,0 +1,761 @@
+.accountability-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 1rem;
+}
+
+.function-selection {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.function-button {
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.25rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  background-color: #f0f0f0;
+  border: 1px solid #ccc;
+}
+
+.function-button.active {
+  background-color: #007bff;
+  color: white;
+  border-color: #0069d9;
+}
+
+/* Supply Sergeant View */
+.equipment-selection {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.filter-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  min-width: 200px;
+}
+
+.equipment-list {
+  width: 100%;
+  border: 1px solid #ddd;
+  border-radius: 0.25rem;
+  overflow: hidden;
+}
+
+.equipment-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.equipment-table-header {
+  display: flex;
+  background-color: #f5f5f5;
+  font-weight: 600;
+  border-bottom: 2px solid #ddd;
+}
+
+.equipment-table-header > div,
+.equipment-item > div {
+  padding: 0.75rem;
+  flex: 1;
+}
+
+.checkbox-cell {
+  flex: 0 0 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.equipment-item {
+  display: flex;
+  border-bottom: 1px solid #eee;
+  cursor: pointer;
+}
+
+.equipment-item:hover {
+  background-color: #f9f9f9;
+}
+
+.equipment-item.selected {
+  background-color: #e6f7ff;
+}
+
+.equipment-group {
+  border-bottom: 1px solid #ddd;
+}
+
+.equipment-group-header {
+  display: flex;
+  background-color: #eef6fc;
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  align-items: center;
+}
+
+.expand-icon {
+  margin-right: 0.5rem;
+  font-size: 0.8rem;
+}
+
+.group-name {
+  font-weight: 600;
+  flex: 1;
+}
+
+.group-count {
+  margin-right: 1rem;
+  color: #666;
+}
+
+.equipment-group-items {
+  border-top: 1px solid #eee;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.primary-button {
+  padding: 0.75rem 1.5rem;
+  background-color: #282c34;
+  color: white;
+  border: none;
+  border-radius: 0.25rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.primary-button:hover {
+  background-color: #1e2228;
+}
+
+.primary-button:disabled {
+  background-color: #6c778d;
+  cursor: not-allowed;
+}
+
+.secondary-button {
+  padding: 0.75rem 1.5rem;
+  background-color: #6c778d;
+  color: white;
+  border: none;
+  border-radius: 0.25rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.secondary-button:hover {
+  background-color: #5a6476;
+}
+
+/* Carousel Styles */
+.accountability-carousel {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 1rem;
+}
+
+.carousel-container {
+  width: 100%;
+  max-width: 600px;
+  position: relative;
+  margin: 1rem auto;
+}
+
+.carousel-cards {
+  position: relative;
+  min-height: 350px;
+  background-color: #f9f9f9;
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.carousel-card {
+  width: 100%;
+  padding: 1.5rem;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  background-color: white;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  border-left: 5px solid #ddd;
+}
+
+.carousel-card.status-accounted {
+  border-left-color: #28a745;
+  background-color: #f2fff8;
+}
+
+.carousel-card.status-not-accounted {
+  border-left-color: #dc3545;
+  background-color: #fff8f8;
+}
+
+.carousel-card.status-pending {
+  border-left-color: #ffc107;
+  background-color: #fffbf0;
+}
+
+.carousel-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.carousel-card-header h3 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.carousel-card-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.carousel-card-details p {
+  margin: 0;
+}
+
+.carousel-card-actions {
+  display: flex;
+  margin-top: 1rem;
+  justify-content: center;
+}
+
+.verification-buttons {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  width: 100%;
+}
+
+.confirm-button {
+  padding: 0.75rem 1.5rem;
+  background-color: #28a745;
+  color: white;
+  border: none;
+  border-radius: 0.25rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.confirm-button:hover {
+  background-color: #218838;
+}
+
+.reject-button {
+  padding: 0.75rem 1.5rem;
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  border-radius: 0.25rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.reject-button:hover {
+  background-color: #c82333;
+}
+
+.carousel-controls {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.carousel-control-button {
+  padding: 0.5rem 1rem;
+  border: 1px solid #ddd;
+  background-color: #6c778d;
+  color: white;
+  border-radius: 0.25rem;
+  cursor: pointer;
+}
+
+.carousel-pagination {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.pagination-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: #ddd;
+  cursor: pointer;
+}
+
+.pagination-dot.active {
+  background-color: #007bff;
+}
+
+.card-status {
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.status-not-accounted {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+.status-accounted {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.status-pending {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+/* Modal styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background-color: white;
+  padding: 2rem;
+  border-radius: 0.5rem;
+  max-width: 90%;
+  width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+
+/* User verification interface */
+.verification-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.input-group input {
+  padding: 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 0.25rem;
+}
+
+.connectivity-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  padding: 0.5rem;
+  border-radius: 0.25rem;
+}
+
+.status-online {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.status-offline {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+.status-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.indicator-online {
+  background-color: #28a745;
+}
+
+.indicator-offline {
+  background-color: #dc3545;
+}
+
+/* Summary results */
+.summary-results {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.summary-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.75rem;
+  border-bottom: 1px solid #eee;
+}
+
+.summary-total {
+  font-weight: 600;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 2px solid #ddd;
+}
+
+.progress-bar-container {
+  width: 100%;
+  height: 20px;
+  background-color: #e9ecef;
+  border-radius: 0.25rem;
+  margin-top: 1rem;
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  background-color: #28a745;
+  transition: width 0.3s ease;
+}
+
+/* Verification Status List styles */
+.verification-status-list {
+  margin-top: 2rem;
+  border: 1px solid #ddd;
+  border-radius: 0.25rem;
+  padding: 1.5rem;
+  background-color: #f9f9f9;
+}
+
+.verification-status-list h3 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid #ddd;
+  padding-bottom: 0.5rem;
+}
+
+.verification-status-list h4 {
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+  font-size: 1.1rem;
+}
+
+.pending-verifications, 
+.completed-verifications {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.verification-item {
+  background-color: white;
+  border-left: 4px solid #f0f0f0;
+  border-radius: 0.25rem;
+  padding: 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.verification-item.status-pending {
+  border-left-color: #ffc107;
+}
+
+.verification-item.status-confirmed {
+  border-left-color: #28a745;
+}
+
+.verification-item.status-rejected {
+  border-left-color: #dc3545;
+}
+
+.verification-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.verification-item-name {
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+.verification-item-status {
+  padding: 0.25rem 0.75rem;
+  border-radius: 1rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.verification-item-status.status-pending {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+.verification-item-status.status-confirmed {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.verification-item-status.status-rejected {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+.verification-item-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  color: #666;
+  font-size: 0.95rem;
+}
+
+.verification-item-details p {
+  margin: 0;
+}
+
+/* Accountability Reports Styles */
+.accountability-reports {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+.session-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.session-item {
+  border: 1px solid #ddd;
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  background-color: #f9f9f9;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.session-item p {
+  margin: 0;
+}
+
+.session-item .action-buttons {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+/* Filter for session lists */
+.session-filter {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.session-filter button {
+  padding: 0.5rem 1rem;
+  border: 1px solid #ddd;
+  background-color: white;
+  border-radius: 0.25rem;
+  cursor: pointer;
+}
+
+.session-filter button.active {
+  background-color: #007bff;
+  color: white;
+  border-color: #0069d9;
+}
+
+/* Progress indicator */
+.session-progress {
+  height: 8px;
+  background-color: #e9ecef;
+  border-radius: 4px;
+  overflow: hidden;
+  margin: 0.5rem 0;
+}
+
+.session-progress-bar {
+  height: 100%;
+  background-color: #28a745;
+}
+
+.session-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.session-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.session-status {
+  padding: 0.25rem 0.75rem;
+  border-radius: 1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.status-active {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+.status-completed {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.status-cancelled {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+.session-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.session-progress-info {
+  margin-top: 0.5rem;
+}
+
+.session-active {
+  border-left: 4px solid #ffc107;
+}
+
+.session-completed {
+  border-left: 4px solid #28a745;
+}
+
+/* Add styles for connectivity controls */
+.connectivity-controls {
+  display: flex;
+  align-items: center;
+  margin-bottom: 15px;
+  background-color: #f5f5f5;
+  padding: 10px 15px;
+  border-radius: 5px;
+  justify-content: space-between;
+}
+
+.connectivity-status {
+  display: flex;
+  align-items: center;
+  font-weight: 500;
+}
+
+.status-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 8px;
+}
+
+.status-online {
+  color: #2e7d32;
+}
+
+.status-offline {
+  color: #c62828;
+}
+
+.indicator-online {
+  background-color: #2e7d32;
+}
+
+.indicator-offline {
+  background-color: #c62828;
+}
+
+.offline-mode-toggle {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.offline-mode-toggle label {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+
+.offline-mode-toggle input {
+  margin-right: 8px;
+  cursor: pointer;
+}
+
+.sync-button {
+  background-color: #1976d2;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.sync-button:hover {
+  background-color: #1565c0;
+}
+
+.sync-button:disabled {
+  background-color: #90caf9;
+  cursor: not-allowed;
+} 

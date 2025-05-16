@@ -7,7 +7,7 @@ function Home() {
 
   return (
     <div className="page-container">
-      <h1>Supply SGT Dashboard v0.20250415.1</h1>
+      <h1>Supply SGT Dashboard v0.20250415.2</h1>
       <div className="button-container">
         <button 
           className="nav-button" 

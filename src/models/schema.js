@@ -120,6 +120,22 @@ export const schema = {
                         ]
                     }
                 },
+                "accountabilitySessions": {
+                    "name": "accountabilitySessions",
+                    "isArray": true,
+                    "type": {
+                        "model": "AccountabilitySession"
+                    },
+                    "isRequired": false,
+                    "attributes": [],
+                    "isArrayNullable": true,
+                    "association": {
+                        "connectionType": "HAS_MANY",
+                        "associatedWith": [
+                            "uic"
+                        ]
+                    }
+                },
                 "createdAt": {
                     "name": "createdAt",
                     "isArray": false,
@@ -285,6 +301,38 @@ export const schema = {
                         "connectionType": "HAS_MANY",
                         "associatedWith": [
                             "user"
+                        ]
+                    }
+                },
+                "conductedSessions": {
+                    "name": "conductedSessions",
+                    "isArray": true,
+                    "type": {
+                        "model": "AccountabilitySession"
+                    },
+                    "isRequired": false,
+                    "attributes": [],
+                    "isArrayNullable": true,
+                    "association": {
+                        "connectionType": "HAS_MANY",
+                        "associatedWith": [
+                            "conductedBy"
+                        ]
+                    }
+                },
+                "verifiedItems": {
+                    "name": "verifiedItems",
+                    "isArray": true,
+                    "type": {
+                        "model": "AccountabilityItem"
+                    },
+                    "isRequired": false,
+                    "attributes": [],
+                    "isArrayNullable": true,
+                    "association": {
+                        "connectionType": "HAS_MANY",
+                        "associatedWith": [
+                            "verifiedBy"
                         ]
                     }
                 },
@@ -1055,6 +1103,22 @@ export const schema = {
                         ]
                     }
                 },
+                "accountabilityItems": {
+                    "name": "accountabilityItems",
+                    "isArray": true,
+                    "type": {
+                        "model": "AccountabilityItem"
+                    },
+                    "isRequired": false,
+                    "attributes": [],
+                    "isArrayNullable": true,
+                    "association": {
+                        "connectionType": "HAS_MANY",
+                        "associatedWith": [
+                            "equipmentItem"
+                        ]
+                    }
+                },
                 "createdAt": {
                     "name": "createdAt",
                     "isArray": false,
@@ -1461,6 +1525,362 @@ export const schema = {
                     }
                 }
             ]
+        },
+        "AccountabilitySession": {
+            "name": "AccountabilitySession",
+            "fields": {
+                "id": {
+                    "name": "id",
+                    "isArray": false,
+                    "type": "ID",
+                    "isRequired": true,
+                    "attributes": []
+                },
+                "uicID": {
+                    "name": "uicID",
+                    "isArray": false,
+                    "type": "ID",
+                    "isRequired": true,
+                    "attributes": []
+                },
+                "uic": {
+                    "name": "uic",
+                    "isArray": false,
+                    "type": {
+                        "model": "UIC"
+                    },
+                    "isRequired": false,
+                    "attributes": [],
+                    "association": {
+                        "connectionType": "BELONGS_TO",
+                        "targetNames": [
+                            "uicID"
+                        ]
+                    }
+                },
+                "conductedByID": {
+                    "name": "conductedByID",
+                    "isArray": false,
+                    "type": "ID",
+                    "isRequired": true,
+                    "attributes": []
+                },
+                "conductedBy": {
+                    "name": "conductedBy",
+                    "isArray": false,
+                    "type": {
+                        "model": "User"
+                    },
+                    "isRequired": false,
+                    "attributes": [],
+                    "association": {
+                        "connectionType": "BELONGS_TO",
+                        "targetNames": [
+                            "conductedByID"
+                        ]
+                    }
+                },
+                "status": {
+                    "name": "status",
+                    "isArray": false,
+                    "type": {
+                        "enum": "SessionStatus"
+                    },
+                    "isRequired": true,
+                    "attributes": []
+                },
+                "startedAt": {
+                    "name": "startedAt",
+                    "isArray": false,
+                    "type": "AWSDateTime",
+                    "isRequired": true,
+                    "attributes": []
+                },
+                "completedAt": {
+                    "name": "completedAt",
+                    "isArray": false,
+                    "type": "AWSDateTime",
+                    "isRequired": false,
+                    "attributes": []
+                },
+                "itemCount": {
+                    "name": "itemCount",
+                    "isArray": false,
+                    "type": "Int",
+                    "isRequired": true,
+                    "attributes": []
+                },
+                "accountedForCount": {
+                    "name": "accountedForCount",
+                    "isArray": false,
+                    "type": "Int",
+                    "isRequired": true,
+                    "attributes": []
+                },
+                "accountabilityItems": {
+                    "name": "accountabilityItems",
+                    "isArray": true,
+                    "type": {
+                        "model": "AccountabilityItem"
+                    },
+                    "isRequired": false,
+                    "attributes": [],
+                    "isArrayNullable": true,
+                    "association": {
+                        "connectionType": "HAS_MANY",
+                        "associatedWith": [
+                            "session"
+                        ]
+                    }
+                },
+                "createdAt": {
+                    "name": "createdAt",
+                    "isArray": false,
+                    "type": "AWSDateTime",
+                    "isRequired": true,
+                    "attributes": []
+                },
+                "updatedAt": {
+                    "name": "updatedAt",
+                    "isArray": false,
+                    "type": "AWSDateTime",
+                    "isRequired": true,
+                    "attributes": []
+                }
+            },
+            "syncable": true,
+            "pluralName": "AccountabilitySessions",
+            "attributes": [
+                {
+                    "type": "model",
+                    "properties": {}
+                },
+                {
+                    "type": "key",
+                    "properties": {
+                        "name": "byUIC",
+                        "fields": [
+                            "uicID"
+                        ]
+                    }
+                },
+                {
+                    "type": "key",
+                    "properties": {
+                        "name": "byConductedBy",
+                        "fields": [
+                            "conductedByID"
+                        ]
+                    }
+                },
+                {
+                    "type": "auth",
+                    "properties": {
+                        "rules": [
+                            {
+                                "allow": "private",
+                                "operations": [
+                                    "create",
+                                    "update",
+                                    "delete",
+                                    "read"
+                                ]
+                            }
+                        ]
+                    }
+                }
+            ]
+        },
+        "AccountabilityItem": {
+            "name": "AccountabilityItem",
+            "fields": {
+                "id": {
+                    "name": "id",
+                    "isArray": false,
+                    "type": "ID",
+                    "isRequired": true,
+                    "attributes": []
+                },
+                "sessionID": {
+                    "name": "sessionID",
+                    "isArray": false,
+                    "type": "ID",
+                    "isRequired": true,
+                    "attributes": []
+                },
+                "session": {
+                    "name": "session",
+                    "isArray": false,
+                    "type": {
+                        "model": "AccountabilitySession"
+                    },
+                    "isRequired": false,
+                    "attributes": [],
+                    "association": {
+                        "connectionType": "BELONGS_TO",
+                        "targetNames": [
+                            "sessionID"
+                        ]
+                    }
+                },
+                "equipmentItemID": {
+                    "name": "equipmentItemID",
+                    "isArray": false,
+                    "type": "ID",
+                    "isRequired": true,
+                    "attributes": []
+                },
+                "equipmentItem": {
+                    "name": "equipmentItem",
+                    "isArray": false,
+                    "type": {
+                        "model": "EquipmentItem"
+                    },
+                    "isRequired": false,
+                    "attributes": [],
+                    "association": {
+                        "connectionType": "BELONGS_TO",
+                        "targetNames": [
+                            "equipmentItemID"
+                        ]
+                    }
+                },
+                "status": {
+                    "name": "status",
+                    "isArray": false,
+                    "type": {
+                        "enum": "ItemStatus"
+                    },
+                    "isRequired": true,
+                    "attributes": []
+                },
+                "verificationMethod": {
+                    "name": "verificationMethod",
+                    "isArray": false,
+                    "type": {
+                        "enum": "VerificationMethod"
+                    },
+                    "isRequired": true,
+                    "attributes": []
+                },
+                "verifiedByID": {
+                    "name": "verifiedByID",
+                    "isArray": false,
+                    "type": "ID",
+                    "isRequired": false,
+                    "attributes": []
+                },
+                "verifiedBy": {
+                    "name": "verifiedBy",
+                    "isArray": false,
+                    "type": {
+                        "model": "User"
+                    },
+                    "isRequired": false,
+                    "attributes": [],
+                    "association": {
+                        "connectionType": "BELONGS_TO",
+                        "targetNames": [
+                            "verifiedByID"
+                        ]
+                    }
+                },
+                "verifiedAt": {
+                    "name": "verifiedAt",
+                    "isArray": false,
+                    "type": "AWSDateTime",
+                    "isRequired": false,
+                    "attributes": []
+                },
+                "confirmationStatus": {
+                    "name": "confirmationStatus",
+                    "isArray": false,
+                    "type": {
+                        "enum": "ConfirmationStatus"
+                    },
+                    "isRequired": false,
+                    "attributes": []
+                },
+                "confirmedAt": {
+                    "name": "confirmedAt",
+                    "isArray": false,
+                    "type": "AWSDateTime",
+                    "isRequired": false,
+                    "attributes": []
+                },
+                "notes": {
+                    "name": "notes",
+                    "isArray": false,
+                    "type": "String",
+                    "isRequired": false,
+                    "attributes": []
+                },
+                "createdAt": {
+                    "name": "createdAt",
+                    "isArray": false,
+                    "type": "AWSDateTime",
+                    "isRequired": true,
+                    "attributes": []
+                },
+                "updatedAt": {
+                    "name": "updatedAt",
+                    "isArray": false,
+                    "type": "AWSDateTime",
+                    "isRequired": true,
+                    "attributes": []
+                }
+            },
+            "syncable": true,
+            "pluralName": "AccountabilityItems",
+            "attributes": [
+                {
+                    "type": "model",
+                    "properties": {}
+                },
+                {
+                    "type": "key",
+                    "properties": {
+                        "name": "bySession",
+                        "fields": [
+                            "sessionID"
+                        ]
+                    }
+                },
+                {
+                    "type": "key",
+                    "properties": {
+                        "name": "byEquipmentItem",
+                        "fields": [
+                            "equipmentItemID"
+                        ]
+                    }
+                },
+                {
+                    "type": "key",
+                    "properties": {
+                        "name": "byVerifiedBy",
+                        "fields": [
+                            "verifiedByID"
+                        ]
+                    }
+                },
+                {
+                    "type": "auth",
+                    "properties": {
+                        "rules": [
+                            {
+                                "allow": "private",
+                                "operations": [
+                                    "create",
+                                    "update",
+                                    "delete",
+                                    "read"
+                                ]
+                            }
+                        ]
+                    }
+                }
+            ]
         }
     },
     "enums": {
@@ -1490,6 +1910,37 @@ export const schema = {
                 "RETURNED"
             ]
         },
+        "SessionStatus": {
+            "name": "SessionStatus",
+            "values": [
+                "ACTIVE",
+                "COMPLETED",
+                "CANCELLED"
+            ]
+        },
+        "ItemStatus": {
+            "name": "ItemStatus",
+            "values": [
+                "ACCOUNTED_FOR",
+                "NOT_ACCOUNTED_FOR",
+                "VERIFICATION_PENDING"
+            ]
+        },
+        "VerificationMethod": {
+            "name": "VerificationMethod",
+            "values": [
+                "DIRECT",
+                "SELF_SERVICE"
+            ]
+        },
+        "ConfirmationStatus": {
+            "name": "ConfirmationStatus",
+            "values": [
+                "PENDING",
+                "CONFIRMED",
+                "FAILED"
+            ]
+        },
         "MaintenanceStatus": {
             "name": "MaintenanceStatus",
             "values": [
@@ -1503,5 +1954,5 @@ export const schema = {
     },
     "nonModels": {},
     "codegenVersion": "3.4.4",
-    "version": "06d9d03321d4e641297ee4c6ccd02fc0"
+    "version": "f5817cfca8403a673983220b2d706351"
 };

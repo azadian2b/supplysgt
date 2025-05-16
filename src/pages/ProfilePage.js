@@ -8,6 +8,7 @@ import { generateClient } from 'aws-amplify/api';
 import { createUIC } from '../graphql/mutations';
 import { Amplify } from 'aws-amplify';
 import { ROLES, getRoleLabel } from '../utils/roleUtils';
+import { syncUserData, safeDataStoreQuery, safeDataStoreSave } from '../utils/DataSyncManager';
 
 // Add this flag at the top of your file to control approval bypass
 // Set to true to bypass approval process, false to use normal approval flow
@@ -20,6 +21,38 @@ const ProfilePage = () => {
   const [userData, setUserData] = useState(null);
   const [uicList, setUicList] = useState([]);
   const [isCreatingNewUIC, setIsCreatingNewUIC] = useState(false);
+  
+  // Add function to force sync User data
+  const forceSyncUserData = async () => {
+    try {
+      setLoading(true);
+      console.log("Forcing sync of user data");
+      
+      // Get current authenticated user
+      const { username } = await getCurrentUser();
+      
+      // Use our sync utility instead of direct DataStore calls
+      const userData = await syncUserData(username);
+      
+      if (userData) {
+        setFormData({
+          firstName: userData.firstName || '',
+          lastName: userData.lastName || '',
+          rank: userData.rank,
+          uicId: userData.uicID,
+          role: userData.role,
+          newUicId: '',
+          newUicName: '',
+        });
+        setUserData(userData);
+      }
+      
+      setLoading(false);
+    } catch (error) {
+      console.error("Error syncing user data:", error);
+      setLoading(false);
+    }
+  };
   
   // Add new state for UIC filtering
   const [uicFilterText, setUicFilterText] = useState('');
@@ -42,11 +75,66 @@ const ProfilePage = () => {
   const [showSoldierLinking, setShowSoldierLinking] = useState(false);
   const [selectedSoldierId, setSelectedSoldierId] = useState('');
 
+  // Move fetchData outside of useEffect so it can be used in multiple places
+  const fetchData = async () => {
+    try {
+      // Use our sync utility instead of direct DataStore calls
+      await safeDataStoreQuery(User);
+      
+      // Get current authenticated user
+      const { username } = await getCurrentUser();
+      const userAttributes = await fetchUserAttributes();
+      
+      // Pre-fill names if available from user attributes
+      if (userAttributes.name) {
+        // Split name into first and last
+        const nameParts = userAttributes.name.trim().split(/\s+/);
+        const lastName = nameParts.pop() || "";
+        const firstName = nameParts.join(" ");
+        
+        setFormData(prev => ({ 
+          ...prev, 
+          firstName: firstName,
+          lastName: lastName 
+        }));
+      }
+      
+      // Fetch user profile if exists
+      const existingUsers = await safeDataStoreQuery(User, u => u.owner.eq(username));
+      const userProfile = existingUsers.length > 0 ? existingUsers[0] : null;
+      
+      if (userProfile) {
+        setFormData({
+          firstName: userProfile.firstName || '',
+          lastName: userProfile.lastName || '',
+          rank: userProfile.rank,
+          uicId: userProfile.uicID,
+          role: userProfile.role,
+          newUicId: '',
+          newUicName: '',
+        });
+        setUserData(userProfile);
+      }
+      
+      // Fetch all UICs
+      const allUICs = await safeDataStoreQuery(UIC);
+      setUicList(allUICs);
+      
+      // Now we can call the function instead of redefining it
+      await fetchUnlinkedSoldiers();
+      
+      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      setLoading(false);
+    }
+  };
+
   // Move this function outside of fetchData to make it accessible in the component
   const fetchUnlinkedSoldiers = async () => {
     if (formData.uicId) {
       try {
-        const unlinkedSoldiers = await DataStore.query(
+        const unlinkedSoldiers = await safeDataStoreQuery(
           Soldier, 
           s => s.uicID.eq(formData.uicId).and(s => s.hasAccount.eq(false)),
           { sort: s => s.lastName(SortDirection.ASCENDING) }
@@ -70,60 +158,26 @@ const ProfilePage = () => {
 
   // Fetch existing data on component mount
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        // Get current authenticated user
-        const { username } = await getCurrentUser();
-        const userAttributes = await fetchUserAttributes();
-        
-        // Pre-fill names if available from user attributes
-        if (userAttributes.name) {
-          // Split name into first and last
-          const nameParts = userAttributes.name.trim().split(/\s+/);
-          const lastName = nameParts.pop() || "";
-          const firstName = nameParts.join(" ");
-          
-          setFormData(prev => ({ 
-            ...prev, 
-            firstName: firstName,
-            lastName: lastName 
-          }));
-        }
-        
-        // Fetch user profile if exists
-        const existingUsers = await DataStore.query(User, u => u.owner.eq(username));
-        const userProfile = existingUsers.length > 0 ? existingUsers[0] : null;
-        
-        if (userProfile) {
-          setFormData({
-            firstName: userProfile.firstName || '',
-            lastName: userProfile.lastName || '',
-            rank: userProfile.rank,
-            uicId: userProfile.uicID,
-            role: userProfile.role,
-            newUicId: '',
-            newUicName: '',
-          });
-          setUserData(userProfile);
-        }
-        
-        // Fetch all UICs
-        const allUICs = await DataStore.query(UIC);
-        setUicList(allUICs);
-        
-        // Now we can call the function instead of redefining it
-        await fetchUnlinkedSoldiers();
-        
-        setLoading(false);
-      } catch (error) {
-        console.error('Error fetching data:', error);
-        setLoading(false);
-      }
-    };
-    
     fetchData();
     verifyUICData();
   }, []);
+  
+  // Add a subscription to User model changes
+  useEffect(() => {
+    const subscription = DataStore.observe(User).subscribe({
+      next: msg => {
+        console.log('DataStore User event:', msg);
+        // If the updated user is the current user, refresh data
+        if (userData && msg.element.id === userData.id) {
+          console.log('Current user data changed, refreshing...');
+          fetchData();
+        }
+      },
+      error: error => console.error('DataStore User subscription error:', error)
+    });
+    
+    return () => subscription.unsubscribe();
+  }, [userData]);
   
   // Add somewhere in your component to check sync status
   useEffect(() => {
@@ -215,7 +269,7 @@ const ProfilePage = () => {
       // Handle UIC creation or selection
       if (isCreatingNewUIC) {
         // Check if UIC already exists - need to check by uicCode now
-        const existingUICs = await DataStore.query(UIC, u => u.uicCode.eq(formData.newUicId));
+        const existingUICs = await safeDataStoreQuery(UIC, u => u.uicCode.eq(formData.newUicId));
         const existingUIC = existingUICs.length > 0 ? existingUICs[0] : null;
         
         console.log('Checking for existing UIC with code:', formData.newUicId);
@@ -251,7 +305,7 @@ const ProfilePage = () => {
         const firstName = nameParts.join(" "); // Rest of words as firstName
 
         // Create soldier record for the user
-        await DataStore.save(
+        await safeDataStoreSave(
           new Soldier({
             firstName: firstName,
             lastName: lastName,
@@ -273,7 +327,7 @@ const ProfilePage = () => {
         // Check if user is already a member of this UIC
         if (userData?.uicID !== userUicId) {
           // User is trying to join an existing UIC
-          const selectedUIC = await DataStore.query(UIC, userUicId);
+          const selectedUIC = await safeDataStoreQuery(UIC, userUicId);
           
           if (selectedUIC) {
             if (!BYPASS_APPROVAL_PROCESS) {
@@ -281,7 +335,7 @@ const ProfilePage = () => {
               console.log('Normal mode: Creating membership request');
               
               try {
-                const membershipRequest = await DataStore.save(
+                const membershipRequest = await safeDataStoreSave(
                   new UICMembershipRequest({
                     userID: userData?.id || username, // Use ID if available, otherwise username
                     uicID: userUicId,
@@ -308,8 +362,9 @@ const ProfilePage = () => {
       
       // Update or create user profile
       if (userData) {
-        await DataStore.save(
-          User.copyOf(userData, updated => {
+        await safeDataStoreSave(
+          userData,
+          updated => {
             updated.firstName = formData.firstName;
             updated.lastName = formData.lastName;
             updated.rank = formData.rank;
@@ -318,12 +373,12 @@ const ProfilePage = () => {
             if (isCreatingNewUIC || !needsApproval) {
               updated.uicID = userUicId;
             }
-          })
+          }
         );
         
         // NEW CODE: Sync changes to linked soldier record if one exists
         // Find soldier records linked to this user
-        const linkedSoldiers = await DataStore.query(
+        const linkedSoldiers = await safeDataStoreQuery(
           Soldier,
           s => s.userId.eq(userData.id)
         );
@@ -332,8 +387,9 @@ const ProfilePage = () => {
           console.log('Found linked soldier record to update:', linkedSoldiers[0]);
           
           // Update the linked soldier record with the user's updated information
-          await DataStore.save(
-            Soldier.copyOf(linkedSoldiers[0], updated => {
+          await safeDataStoreSave(
+            linkedSoldiers[0],
+            updated => {
               updated.firstName = formData.firstName;
               updated.lastName = formData.lastName;
               updated.rank = formData.rank;
@@ -346,13 +402,13 @@ const ProfilePage = () => {
                 updated.email = userAttributes.email;
               }
               updated.updatedAt = new Date().toISOString();
-            })
+            }
           );
           
           console.log('Updated linked soldier record with new user information');
         }
       } else {
-        await DataStore.save(
+        await safeDataStoreSave(
           new User({
             owner: username,
             firstName: formData.firstName,
@@ -364,34 +420,29 @@ const ProfilePage = () => {
         );
       }
       
-      // Show success message and redirect
-      alert(needsApproval 
-        ? 'Profile updated. Your request to join the UIC is pending approval.' 
-        : 'Profile updated successfully');
-      
-      navigate('/');
-
       // Inside the try block after checking for needsApproval
       if (selectedSoldierId) {
         try {
           // Get the selected soldier
-          const soldier = await DataStore.query(Soldier, selectedSoldierId);
+          const soldier = await safeDataStoreQuery(Soldier, selectedSoldierId);
           
           if (soldier) {
             // Update the soldier to mark it as having an account and link to user
-            await DataStore.save(
-              Soldier.copyOf(soldier, updated => {
+            await safeDataStoreSave(
+              soldier,
+              updated => {
                 updated.hasAccount = true;
                 updated.userId = userData?.id;
-              })
+              }
             );
             
             // Store the reference to the soldier ID in the user
             if (userData) {
-              await DataStore.save(
-                User.copyOf(userData, updated => {
+              await safeDataStoreSave(
+                userData,
+                updated => {
                   updated.linkedSoldierId = soldier.id;
-                })
+                }
               );
             }
             
@@ -401,6 +452,13 @@ const ProfilePage = () => {
           console.error('Error linking soldier record:', soldierLinkError);
         }
       }
+      
+      // Show success message and redirect
+      alert(needsApproval 
+        ? 'Profile updated. Your request to join the UIC is pending approval.' 
+        : 'Profile updated successfully');
+      
+      navigate('/');
     } catch (error) {
       console.error('Error saving profile:', error);
       alert(`Error saving profile: ${error.message || 'Unknown error'}`);
@@ -411,7 +469,7 @@ const ProfilePage = () => {
   // Add this function to check what's in your database
   const verifyUICData = async () => {
     try {
-      const allUICs = await DataStore.query(UIC);
+      const allUICs = await safeDataStoreQuery(UIC);
       console.log('Current UICs in database:', allUICs.map(uic => ({
         id: uic.id,
         uicCode: uic.uicCode,
@@ -431,17 +489,17 @@ const ProfilePage = () => {
     try {
       setLoading(true);
       // Delete all membership requests first (because of relationships)
-      const allRequests = await DataStore.query(UICMembershipRequest);
+      const allRequests = await safeDataStoreQuery(UICMembershipRequest);
       console.log(`Deleting ${allRequests.length} membership requests...`);
       await Promise.all(allRequests.map(request => DataStore.delete(request)));
       
       // Delete all users
-      const allUsers = await DataStore.query(User);
+      const allUsers = await safeDataStoreQuery(User);
       console.log(`Deleting ${allUsers.length} users...`);
       await Promise.all(allUsers.map(user => DataStore.delete(user)));
       
       // Delete all UICs
-      const allUICs = await DataStore.query(UIC);
+      const allUICs = await safeDataStoreQuery(UIC);
       console.log(`Deleting ${allUICs.length} UICs...`);
       await Promise.all(allUICs.map(uic => DataStore.delete(uic)));
       
@@ -458,7 +516,7 @@ const ProfilePage = () => {
   const runDiagnostics = async () => {
     try {
       // Get all UICs using DataStore
-      const dsUICs = await DataStore.query(UIC);
+      const dsUICs = await safeDataStoreQuery(UIC);
       console.log('UICs from DataStore:', dsUICs);
       
       // Try to get the UIC using its known ID
@@ -467,7 +525,7 @@ const ProfilePage = () => {
         console.log('First UIC ID:', firstId);
         
         // Try direct lookup
-        const directLookup = await DataStore.query(UIC, firstId);
+        const directLookup = await safeDataStoreQuery(UIC, firstId);
         console.log('Direct lookup result:', directLookup);
         
         // Inspect all UIC fields
@@ -489,7 +547,7 @@ const ProfilePage = () => {
     
     try {
       setLoading(true);
-      const allUICs = await DataStore.query(UIC);
+      const allUICs = await safeDataStoreQuery(UIC);
       
       for (const uic of allUICs) {
         // Skip if uicCode is already set
@@ -505,10 +563,11 @@ const ProfilePage = () => {
         
         console.log(`Migrating UIC ${uic.id} to use uicCode: ${uicCode}`);
         
-        await DataStore.save(
-          UIC.copyOf(uic, updated => {
+        await safeDataStoreSave(
+          uic,
+          updated => {
             updated.uicCode = uicCode;
-          })
+          }
         );
       }
       
@@ -532,7 +591,7 @@ const ProfilePage = () => {
       setLoading(true);
       
       // Fix roles in Soldier records
-      const allSoldiers = await DataStore.query(Soldier);
+      const allSoldiers = await safeDataStoreQuery(Soldier);
       console.log(`Standardizing roles for ${allSoldiers.length} soldiers...`);
       
       for (const soldier of allSoldiers) {
@@ -558,15 +617,18 @@ const ProfilePage = () => {
         }
         
         if (needsUpdate) {
-          await DataStore.save(Soldier.copyOf(soldier, updated => {
-            updated.role = standardRole;
-          }));
+          await safeDataStoreSave(
+            soldier,
+            updated => {
+              updated.role = standardRole;
+            }
+          );
           console.log(`Updated soldier ${soldier.id}'s role to ${standardRole}`);
         }
       }
       
       // Fix roles in User records
-      const allUsers = await DataStore.query(User);
+      const allUsers = await safeDataStoreQuery(User);
       console.log(`Standardizing roles for ${allUsers.length} users...`);
       
       for (const user of allUsers) {
@@ -592,9 +654,12 @@ const ProfilePage = () => {
         }
         
         if (needsUpdate) {
-          await DataStore.save(User.copyOf(user, updated => {
-            updated.role = standardRole;
-          }));
+          await safeDataStoreSave(
+            user,
+            updated => {
+              updated.role = standardRole;
+            }
+          );
           console.log(`Updated user ${user.id}'s role to ${standardRole}`);
         }
       }
@@ -625,7 +690,7 @@ const ProfilePage = () => {
     
     try {
       // Check if user is already in the roster
-      const existingSoldiers = await DataStore.query(
+      const existingSoldiers = await safeDataStoreQuery(
         Soldier,
         s => s.userId.eq(userData.id)
       );
@@ -636,7 +701,7 @@ const ProfilePage = () => {
       }
       
       // Use firstName and lastName directly from userData
-      await DataStore.save(
+      await safeDataStoreSave(
         new Soldier({
           firstName: userData.firstName || '',
           lastName: userData.lastName || '',
@@ -668,7 +733,7 @@ const ProfilePage = () => {
       setLoading(true);
       
       // Get all users
-      const allUsers = await DataStore.query(User);
+      const allUsers = await safeDataStoreQuery(User);
       console.log(`Migrating names for ${allUsers.length} users...`);
       
       let migratedCount = 0;
@@ -688,11 +753,12 @@ const ProfilePage = () => {
           const firstName = nameParts.length > 0 ? nameParts.join(" ") : "Unknown";
           
           // Update user record
-          await DataStore.save(
-            User.copyOf(user, updated => {
+          await safeDataStoreSave(
+            user,
+            updated => {
               updated.firstName = firstName;
               updated.lastName = lastName;
-            })
+            }
           );
           
           console.log(`Migrated user ${user.id}: "${user.name}" → First: "${firstName}", Last: "${lastName}"`);
@@ -719,6 +785,21 @@ const ProfilePage = () => {
       <h1>Update Your Profile</h1>
       
       <form onSubmit={handleSubmit} className="profile-form">
+        <div className="form-actions" style={{ marginBottom: '20px' }}>
+          <button 
+            type="button" 
+            className="refresh-btn" 
+            onClick={async () => {
+              setLoading(true);
+              await forceSyncUserData();
+              await fetchData();
+              setLoading(false);
+            }}
+          >
+            Refresh Data
+          </button>
+        </div>
+        
         <div className="form-row">
           <div className="form-group">
             <label htmlFor="firstName">First Name:</label>

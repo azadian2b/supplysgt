@@ -334,7 +334,7 @@
 /* Button styles */
 .modal-actions .primary-button,
 .modal-actions .secondary-button {
-  background-color: #444;
+  background-color: #282c34;
   color: white;
   padding: 10px 20px;
   border: none;
@@ -346,28 +346,28 @@
 
 .modal-actions .primary-button:hover,
 .modal-actions .secondary-button:hover {
-  background-color: #333;
+  background-color: #1e2228;
 }
 
 .modal-actions .primary-button:disabled,
 .modal-actions .secondary-button:disabled {
-  background-color: #767676;
+  background-color: #6c778d;
   cursor: not-allowed;
   opacity: 0.6;
 }
 
 /* Keep the blue theme for the UIC selection button */
 .uic-selection .primary-button {
-  background-color: #3498db;
+  background-color: #282c34;
   color: white;
 }
 
 .uic-selection .primary-button:hover {
-  background-color: #2980b9;
+  background-color: #1e2228;
 }
 
 .uic-selection .primary-button:disabled {
-  background-color: #7fb9e2;
+  background-color: #6c778d;
   cursor: not-allowed;
 }
 
@@ -1345,7 +1345,8 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  background-color: var(--background-color);
+  background-color: #282c34;
+  color: white;
   border: 1px solid var(--border-color);
   border-radius: 8px;
   padding: 15px;
@@ -1355,8 +1356,9 @@
 
 .group-tile:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  border-color: var(--primary-color);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  background-color: #3a3f48;
+  border-color: #6c778d;
 }
 
 .group-tile-content {
@@ -1406,13 +1408,13 @@
 .group-tile h4 {
   margin-top: 0;
   margin-bottom: 10px;
-  color: var(--primary-color);
+  color: white;
 }
 
 .group-tile p {
   margin: 0;
   font-size: 14px;
-  color: var(--text-color-secondary);
+  color: rgba(255, 255, 255, 0.8);
 }
 
 .no-groups-message {

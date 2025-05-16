@@ -5,6 +5,7 @@ import { Authenticator } from '@aws-amplify/ui-react';
 import '@aws-amplify/ui-react/styles.css';
 import './App.css';
 import './styles/Theme.css';
+import './styles/Buttons.css';
 import ProfilePage from './pages/ProfilePage';
 import UpdateNotification from './components/UpdateNotification';
 

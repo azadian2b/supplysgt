@@ -12,6 +12,7 @@ type UIC @model
   equipmentItems: [EquipmentItem] @hasMany(indexName: "byUIC", fields: ["id"])
   equipmentGroups: [EquipmentGroup] @hasMany(indexName: "byUIC", fields: ["id"])
   handReceiptStatuses: [HandReceiptStatus] @hasMany(indexName: "byFromUIC", fields: ["id"])
+  accountabilitySessions: [AccountabilitySession] @hasMany(indexName: "byUIC", fields: ["id"])
 }
 
 type User @model 
@@ -33,6 +34,8 @@ type User @model
   linkedSoldierId: ID
   # Add a field to let us look up Users from Soldiers
   soldiersLinked: [Soldier] @hasMany(indexName: "byUser", fields: ["id"])
+  conductedSessions: [AccountabilitySession] @hasMany(indexName: "byConductedBy", fields: ["id"])
+  verifiedItems: [AccountabilityItem] @hasMany(indexName: "byVerifiedBy", fields: ["id"])
 }
 
 type UICMembershipRequest @model 
@@ -133,6 +136,7 @@ type EquipmentItem @model
   groupID: ID @index(name: "byEquipmentGroup")
   equipmentGroup: EquipmentGroup @belongsTo(fields: ["groupID"])
   handReceiptStatuses: [HandReceiptStatus] @hasMany(indexName: "byEquipmentItem", fields: ["id"])
+  accountabilityItems: [AccountabilityItem] @hasMany(indexName: "byEquipmentItem", fields: ["id"])
   createdAt: AWSDateTime!
   updatedAt: AWSDateTime!
 }
@@ -179,6 +183,70 @@ enum HandReceiptStatusType {
   GENERATED
   ISSUED
   RETURNED
+}
+
+# Models for Equipment Accountability functionality
+type AccountabilitySession @model
+@auth(rules: [
+  { allow: private }
+]) {
+  id: ID!
+  uicID: ID! @index(name: "byUIC")
+  uic: UIC @belongsTo(fields: ["uicID"])
+  conductedByID: ID! @index(name: "byConductedBy")
+  conductedBy: User @belongsTo(fields: ["conductedByID"])
+  status: SessionStatus!
+  startedAt: AWSDateTime!
+  completedAt: AWSDateTime
+  itemCount: Int!
+  accountedForCount: Int!
+  accountabilityItems: [AccountabilityItem] @hasMany(indexName: "bySession", fields: ["id"])
+  createdAt: AWSDateTime!
+  updatedAt: AWSDateTime!
+}
+
+type AccountabilityItem @model
+@auth(rules: [
+  { allow: private }
+]) {
+  id: ID!
+  sessionID: ID! @index(name: "bySession")
+  session: AccountabilitySession @belongsTo(fields: ["sessionID"])
+  equipmentItemID: ID! @index(name: "byEquipmentItem")
+  equipmentItem: EquipmentItem @belongsTo(fields: ["equipmentItemID"])
+  status: ItemStatus!
+  verificationMethod: VerificationMethod!
+  verifiedByID: ID @index(name: "byVerifiedBy")
+  verifiedBy: User @belongsTo(fields: ["verifiedByID"])
+  verifiedAt: AWSDateTime
+  confirmationStatus: ConfirmationStatus
+  confirmedAt: AWSDateTime
+  notes: String
+  createdAt: AWSDateTime!
+  updatedAt: AWSDateTime!
+}
+
+enum SessionStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum ItemStatus {
+  ACCOUNTED_FOR
+  NOT_ACCOUNTED_FOR
+  VERIFICATION_PENDING
+}
+
+enum VerificationMethod {
+  DIRECT
+  SELF_SERVICE
+}
+
+enum ConfirmationStatus {
+  PENDING
+  CONFIRMED
+  FAILED
 }
 
 enum MaintenanceStatus {

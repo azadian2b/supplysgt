@@ -1,10 +1,20 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { generateClient } from 'aws-amplify/api';
 import { getCurrentUser } from 'aws-amplify/auth';
-import { uploadData, getUrl } from 'aws-amplify/storage';
-import { PDFDocument } from 'pdf-lib';
 import './Pages.css';
 import './Issue.css';
+
+// Import custom hooks
+import useEquipment from '../hooks/useEquipment';
+import useSoldiers from '../hooks/useSoldiers';
+import usePdfGeneration from '../hooks/usePdfGeneration';
+import useHandReceipts from '../hooks/useHandReceipts';
+
+// Import components
+import ActiveHandReceipts from '../components/ActiveHandReceipts';
+
+// Create client at module level to prevent reinitialization
+const client = generateClient();
 
 function Issue() {
   // State variables
@@ -14,37 +24,89 @@ function Issue() {
   const [uicID, setUicID] = useState(null);
   const [uicCode, setUicCode] = useState('');
   const [uicName, setUicName] = useState('');
-  const [equipment, setEquipment] = useState([]);
-  const [soldiers, setSoldiers] = useState([]);
-  const [soldiersMap, setSoldiersMap] = useState({});
-  const [groups, setGroups] = useState([]);
-  const [groupsMap, setGroupsMap] = useState({});
-  const [masterItems, setMasterItems] = useState({});
+  const [receiptActions, setReceiptActions] = useState({}); // Tracks which receipts have been downloaded/issued
   
-  // Selection state
-  const [selectedItems, setSelectedItems] = useState([]);
-  const [expandedGroups, setExpandedGroups] = useState({});
-  
-  // Filter state
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterBySoldier, setFilterBySoldier] = useState('all');
-  const [filterByStatus, setFilterByStatus] = useState('all');
-  
-  // PDF generation state
-  const [generatedPdfs, setGeneratedPdfs] = useState([]);
-  const [generating, setGenerating] = useState(false);
-  
-  // Hand Receipt Status tracking
-  const [itemStatusMap, setItemStatusMap] = useState({}); // Maps item ID to its current hand receipt status
-  const [receiptActions, setReceiptActions] = useState({}); // Tracks which receipts have been downloaded/issued/returned
-  const [processingAction, setProcessingAction] = useState(false);
-  
-  const client = generateClient();
+  // Flag to prevent reloading data
+  const initialDataLoaded = useRef(false);
 
-  // Load data on mount
+  // Custom hooks
+  const { 
+    equipment,
+    masterItems,
+    groups,
+    groupsMap,
+    itemStatusMap,
+    selectedItems,
+    expandedGroups,
+    searchTerm,
+    setSearchTerm,
+    filterBySoldier,
+    setFilterBySoldier,
+    filterByStatus,
+    setFilterByStatus,
+    toggleItemSelection,
+    toggleGroupExpansion,
+    getGroupItems,
+    getFilteredEquipment,
+    clearSelectedItems,
+    refreshEquipmentData,
+    setError: setEquipmentError,
+    setSelectedItems
+  } = useEquipment(uicID);
+
+  const {
+    soldiers,
+    soldiersMap,
+    getSoldierFullName,
+    loadSoldiers
+  } = useSoldiers(uicID);
+
+  const {
+    generating,
+    generatedPdfs,
+    generatePdfs,
+    downloadPdf,
+    downloadAllPdfs,
+    uploadPdfToS3
+  } = usePdfGeneration(uicCode, uicName);
+
+  const {
+    activeHandReceipts,
+    processingAction,
+    loadActiveHandReceipts,
+    getHandReceiptPdf,
+    returnHandReceipt,
+    returnHandReceiptItem,
+    setError: setHandReceiptError,
+    setSuccess: setHandReceiptSuccess
+  } = useHandReceipts(uicID);
+
+  // Load data only once on mount
   useEffect(() => {
-    loadInitialData();
+    if (!initialDataLoaded.current) {
+      loadInitialData();
+      initialDataLoaded.current = true;
+    }
   }, []);
+
+  // Safely handle error propagation from hooks
+  useEffect(() => {
+    if (setEquipmentError && setEquipmentError !== error) {
+      setError(setEquipmentError);
+    }
+  }, [setEquipmentError]);
+
+  useEffect(() => {
+    if (setHandReceiptError && setHandReceiptError !== error) {
+      setError(setHandReceiptError);
+    }
+  }, [setHandReceiptError]);
+
+  useEffect(() => {
+    if (setHandReceiptSuccess && setHandReceiptSuccess !== success) {
+      setSuccess(setHandReceiptSuccess);
+    }
+  }, [setHandReceiptSuccess]);
 
   // Load all necessary data
   const loadInitialData = async () => {
@@ -95,14 +157,6 @@ function Issue() {
       setUicCode(uic.uicCode);
       setUicName(uic.name);
       
-      // Load assigned equipment, soldiers, and groups in parallel
-      await Promise.all([
-        loadAssignedEquipment(uic.id),
-        loadSoldiers(uic.id),
-        loadEquipmentGroups(uic.id),
-        loadHandReceiptStatuses(uic.id)
-      ]);
-      
       setLoading(false);
     } catch (error) {
       console.error('Error loading initial data:', error);
@@ -111,461 +165,16 @@ function Issue() {
     }
   };
 
-  // Load equipment items that are assigned to soldiers
-  const loadAssignedEquipment = async (uicId) => {
-    try {
-      // Query for equipment items that have assignedToID
-      const equipmentResponse = await client.graphql({
-        query: `query GetAssignedEquipmentItemsByUIC($uicID: ID!) {
-          equipmentItemsByUicID(
-            uicID: $uicID,
-            filter: { 
-              assignedToID: { attributeExists: true },
-              _deleted: { ne: true }
-            }
-          ) {
-            items {
-              id
-              nsn
-              lin
-              serialNumber
-              stockNumber
-              location
-              assignedToID
-              groupID
-              isPartOfGroup
-              maintenanceStatus
-              equipmentMasterID
-              _version
-            }
-          }
-        }`,
-        variables: { uicID: uicId }
-      });
-      
-      const items = equipmentResponse.data.equipmentItemsByUicID.items;
-      
-      // Get master equipment data for item details
-      const masterIds = [...new Set(items.map(item => item.equipmentMasterID))];
-      const masterItemsMap = {};
-      
-      for (const masterId of masterIds) {
-        try {
-          const masterResponse = await client.graphql({
-            query: `query GetEquipmentMaster($id: ID!) {
-              getEquipmentMaster(id: $id) {
-                id
-                nsn
-                commonName
-                description
-              }
-            }`,
-            variables: { id: masterId }
-          });
-          
-          const masterData = masterResponse.data.getEquipmentMaster;
-          if (masterData) {
-            masterItemsMap[masterId] = masterData;
-          }
-        } catch (err) {
-          console.error(`Error fetching master data for ${masterId}:`, err);
-        }
-      }
-      
-      setMasterItems(masterItemsMap);
-      setEquipment(items);
-      
-      return items;
-    } catch (error) {
-      console.error('Error loading assigned equipment:', error);
-      throw error;
-    }
-  };
-
-  // Load soldiers for the UIC
-  const loadSoldiers = async (uicId) => {
-    try {
-      const soldiersResponse = await client.graphql({
-        query: `query GetSoldiersByUIC($uicID: ID!) {
-          soldiersByUicID(uicID: $uicID) {
-            items {
-              id
-              firstName
-              lastName
-              rank
-              role
-              hasAccount
-            }
-          }
-        }`,
-        variables: { uicID: uicId }
-      });
-      
-      const soldiersList = soldiersResponse.data.soldiersByUicID.items;
-      
-      // Create a map for quick lookup
-      const soldiersMapObj = {};
-      soldiersList.forEach(soldier => {
-        soldiersMapObj[soldier.id] = soldier;
-      });
-      
-      setSoldiers(soldiersList);
-      setSoldiersMap(soldiersMapObj);
-      
-      return soldiersList;
-    } catch (error) {
-      console.error('Error loading soldiers:', error);
-      throw error;
-    }
-  };
-
-  // Load equipment groups
-  const loadEquipmentGroups = async (uicId) => {
-    try {
-      const groupsResponse = await client.graphql({
-        query: `query GetEquipmentGroupsByUIC($uicID: ID!) {
-          equipmentGroupsByUicID(
-            uicID: $uicID,
-            filter: {
-              assignedToID: { attributeExists: true },
-              _deleted: { ne: true }
-            }
-          ) {
-            items {
-              id
-              name
-              description
-              assignedToID
-              _version
-            }
-          }
-        }`,
-        variables: { uicID: uicId }
-      });
-      
-      const groupsList = groupsResponse.data.equipmentGroupsByUicID.items;
-      
-      // Create a map for quick lookup
-      const groupsMapObj = {};
-      groupsList.forEach(group => {
-        groupsMapObj[group.id] = group;
-      });
-      
-      setGroups(groupsList);
-      setGroupsMap(groupsMapObj);
-      
-      return groupsList;
-    } catch (error) {
-      console.error('Error loading equipment groups:', error);
-      throw error;
-    }
-  };
-
-  // Toggle selection of an item
-  const toggleItemSelection = (item) => {
-    // Check if this item is already on a hand receipt
-    if (itemStatusMap[item.id] && itemStatusMap[item.id].status === 'HAND_RECEIPTED') {
-      setError(`This item is currently on hand receipt ${itemStatusMap[item.id].receiptNumber} and cannot be selected.`);
-      return;
-    }
-    
-    if (selectedItems.some(i => i.id === item.id)) {
-      setSelectedItems(selectedItems.filter(i => i.id !== item.id));
-    } else {
-      setSelectedItems([...selectedItems, item]);
-    }
-  };
-
-  // Toggle expansion of a group
-  const toggleGroupExpansion = (groupId) => {
-    setExpandedGroups(prev => ({
-      ...prev,
-      [groupId]: !prev[groupId]
-    }));
-  };
-
-  // Filter equipment based on search and filters
-  const filteredEquipment = equipment.filter(item => {
-    const inSearchTerm = searchTerm === '' ||
-      (masterItems[item.equipmentMasterID]?.commonName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.nsn.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.lin.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (item.serialNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (item.stockNumber || '').toLowerCase().includes(searchTerm.toLowerCase());
-    
-    // Filter by soldier
-    const matchesSoldierFilter = filterBySoldier === 'all' || item.assignedToID === filterBySoldier;
-    
-    // Filter by maintenance status
-    const matchesStatusFilter = filterByStatus === 'all' || item.maintenanceStatus === filterByStatus;
-    
-    return inSearchTerm && matchesSoldierFilter && matchesStatusFilter;
-  });
-
-  // Get group items
-  const getGroupItems = (groupId) => {
-    return equipment.filter(item => item.groupID === groupId);
-  };
-
-  // Format item description for 2062 form
-  const formatItemDescription = (item) => {
-    const masterData = masterItems[item.equipmentMasterID];
-    const name = masterData?.commonName || `Item ${item.nsn}`;
-    const serialPart = item.serialNumber ? `:${item.serialNumber}` : '';
-    const stockPart = item.stockNumber ? ` - ${item.stockNumber}` : '';
-    
-    return `${name}${serialPart}${stockPart}`;
-  };
-
-  // Generate the hand receipt number
-  const generateHandReceiptNumber = (soldier) => {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
-    
-    const dateStr = `${year}${month}${day}`;
-    const lastName = soldier.lastName.substring(0, 3).toUpperCase();
-    const firstName = soldier.firstName.substring(0, 1).toUpperCase();
-    
-    return `${dateStr}${lastName}${firstName}`;
-  };
-
-  // Generate 2062 PDF for a given soldier and their equipment
-  const generate2062Pdf = async (soldier, soldierItems) => {
-    try {
-      // Load the existing fillable PDF form
-      const formUrl = `${process.env.PUBLIC_URL}/DA Form 2062.pdf`;
-      const formBytes = await fetch(formUrl).then(res => res.arrayBuffer());
-      
-      // Load the PDF document, ignoring potential encryption
-      const pdfDoc = await PDFDocument.load(formBytes, { 
-        ignoreEncryption: true 
-      });
-      
-      // Get the form from the document
-      const form = pdfDoc.getForm();
-      
-      // Generate hand receipt number
-      const receiptNumber = generateHandReceiptNumber(soldier);
-      
-      // Fill form fields
-      // Main fields
-      form.getTextField('form1[0].Page1[0].FROM[0]').setText(`${uicCode} - ${uicName}`);
-      form.getTextField('form1[0].Page1[0].TO[0]').setText(`${soldier.rank} ${soldier.lastName}, ${soldier.firstName}`);
-      form.getTextField('form1[0].Page1[0].RECPTNR[0]').setText(receiptNumber);
-      
-      // Item fields
-      const maxItemsPerPage = 16; // Based on the form layout
-      
-      // ---- Group non-serialized, non-stock-numbered items ----
-      const groupedItems = {};
-      const individualItems = [];
-      
-      soldierItems.forEach(item => {
-        if (!item.serialNumber && !item.stockNumber) {
-          // Potentially groupable item
-          const key = item.equipmentMasterID;
-          if (!groupedItems[key]) {
-            groupedItems[key] = {
-              ...item, // Use first item as template
-              quantity: 0
-            };
-          }
-          groupedItems[key].quantity += 1;
-        } else {
-          // Individual item (serialized or has stock number)
-          individualItems.push({ ...item, quantity: 1 });
-        }
-      });
-      
-      // Combine grouped and individual items into the final list for the form
-      const formItems = [...Object.values(groupedItems), ...individualItems];
-      // Sort for consistent order if needed (optional)
-      formItems.sort((a, b) => (a.nsn || '').localeCompare(b.nsn || ''));
-      
-      // ---- Process items for the form ----
-      formItems.forEach((item, index) => {
-        // Determine if we're on the first page or need to use overflow fields
-        const fieldSuffix = index === 0 ? '' : `_${index}`;
-        
-        // Account for page overflow
-        if (index >= maxItemsPerPage) {
-          console.log(`Warning: More than ${maxItemsPerPage} items, some may not fit on the form`);
-          // We could handle this by creating additional form pages if needed
-          return; // Skip items beyond first page for now
-        }
-        
-        // Fill item fields
-        // Stock number (NSN)
-        form.getTextField(`form1[0].Page1[0].STOCKNRA${fieldSuffix}[0]`).setText(item.nsn);
-        
-        // Item description - Set smaller font size
-        const description = formatItemDescription(item);
-        const descriptionField = form.getTextField(`form1[0].Page1[0].ITEMDESA${fieldSuffix}[0]`);
-        descriptionField.setFontSize(8); // Set font size to 8pt
-        descriptionField.setText(description);
-        
-        // Unit of issue
-        form.getTextField(`form1[0].Page1[0].UIA${fieldSuffix}[0]`).setText('ea');
-        
-        // Quantity - Use the calculated quantity
-        form.getTextField(`form1[0].Page1[0].QTYAA${fieldSuffix}[0]`).setText(item.quantity.toString());
-        //just set quantity authorized to quantity
-        form.getTextField(`form1[0].Page1[0].QTYAUTHA${fieldSuffix}[0]`).setText(item.quantity.toString());
-      });
-      
-      // Flatten the form (optional, makes it non-editable)
-      form.flatten();
-      
-      // Save the PDF
-      const pdfBytes = await pdfDoc.save();
-      
-      // Convert to data URL for download
-      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-      const dataUrl = URL.createObjectURL(blob);
-      
-      return {
-        name: `${receiptNumber}_${soldier.lastName}_${soldier.firstName}.pdf`,
-        dataUrl: dataUrl,
-        blob: blob
-      };
-    } catch (error) {
-      console.error('Error generating PDF for soldier:', soldier.id, error);
-      throw error;
-    }
-  };
-
-  // Generate all 2062 PDFs for selected equipment
-  const generatePdfs = async () => {
-    try {
-      if (selectedItems.length === 0) {
-        setError('Please select at least one item to generate hand receipts.');
-        return;
-      }
-      
-      setGenerating(true);
-      setError('');
-      setSuccess('');
-      
-      // Group selected items by soldier
-      const itemsBySoldier = {};
-      
-      selectedItems.forEach(item => {
-        if (!itemsBySoldier[item.assignedToID]) {
-          itemsBySoldier[item.assignedToID] = [];
-        }
-        itemsBySoldier[item.assignedToID].push(item);
-      });
-      
-      // Generate a PDF for each soldier
-      const pdfFiles = [];
-      
-      for (const soldierId in itemsBySoldier) {
-        const soldier = soldiersMap[soldierId];
-        if (!soldier) continue;
-        
-        const items = itemsBySoldier[soldierId];
-        // Note: generate2062Pdf is now async
-        const pdfFile = await generate2062Pdf(soldier, items);
-        pdfFiles.push(pdfFile);
-      }
-      
-      setGeneratedPdfs(pdfFiles);
-      setSuccess(`Generated ${pdfFiles.length} hand receipt${pdfFiles.length !== 1 ? 's' : ''}.`);
-    } catch (error) {
-      console.error('Error generating PDFs:', error);
-      setError('Failed to generate hand receipts. Please try again.');
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  // Download a specific PDF
-  const downloadPdf = (pdfFile) => {
-    const link = document.createElement('a');
-    link.href = pdfFile.dataUrl;
-    link.download = pdfFile.name;
-    link.click();
-    
-    // Mark this PDF as downloaded so the Items Issued button can be enabled
-    setReceiptActions(prev => ({
-      ...prev,
-      [pdfFile.name]: { ...prev[pdfFile.name], downloaded: true }
-    }));
-  };
-
-  // Download all generated PDFs as a ZIP file
-  const downloadAllPdfs = async () => {
-    try {
-      if (generatedPdfs.length === 0) {
-        setError('No hand receipts have been generated yet.');
-        return;
-      }
-      
-      // For a small number of PDFs, download them individually
-      if (generatedPdfs.length <= 3) {
-        generatedPdfs.forEach(pdf => downloadPdf(pdf));
-        return;
-      }
-      
-      // For larger numbers, it would be better to use JSZip 
-      // but for simplicity we'll just download them individually
-      generatedPdfs.forEach(pdf => downloadPdf(pdf));
-    } catch (error) {
-      console.error('Error downloading PDFs:', error);
-      setError('Failed to download hand receipts. Please try again.');
-    }
-  };
-
-  // Upload PDF to S3 and return the key
-  const uploadPdfToS3 = async (pdfFile) => {
-    try {
-      const key = `hand-receipts/${pdfFile.name}`;
-      
-      // Upload the PDF to S3
-      await uploadData({
-        key,
-        data: pdfFile.blob,
-        options: {
-          contentType: 'application/pdf'
-        }
-      });
-      
-      return key;
-    } catch (error) {
-      console.error('Error uploading PDF to S3:', error);
-      throw error;
-    }
-  };
-  
-  // Get hand receipt items (both individual items and grouped items)
-  const getHandReceiptItems = (pdfFile) => {
-    // Find the soldier by looking at PDF filename
-    // Format: YYYYMMDDLASF.pdf (where LAS=3 chars of last name, F=first char of first name)
-    const nameParts = pdfFile.name.split('_');
-    const receiptNumber = nameParts[0];
-    
-    // Find all selected items for this soldier's receipt 
-    const soldierId = Object.keys(soldiersMap).find(id => {
-      const soldier = soldiersMap[id];
-      const lastName = soldier.lastName.substring(0, 3).toUpperCase();
-      const firstName = soldier.firstName.substring(0, 1).toUpperCase();
-      return receiptNumber.endsWith(`${lastName}${firstName}`);
-    });
-    
-    if (!soldierId) return [];
-    
-    return selectedItems.filter(item => item.assignedToID === soldierId);
-  };
-  
-  // Mark items as issued (create HandReceiptStatus records)
+  // Mark items as issued (create HandReceiptStatus records) - this is an explicit user action
   const handleMarkItemsIssued = async (pdfFile) => {
     try {
-      setProcessingAction(true);
       setError('');
       
-      const items = getHandReceiptItems(pdfFile);
+      // Get hand receipt items
+      const items = selectedItems.filter(item => 
+        item.assignedToID === pdfFile.soldier.id
+      );
+      
       if (items.length === 0) {
         setError('Could not find items for this receipt.');
         return;
@@ -574,16 +183,10 @@ function Issue() {
       // Upload PDF to S3 first
       const s3Key = await uploadPdfToS3(pdfFile);
       
-      // Extract receipt number from filename
-      const receiptNumber = pdfFile.name.split('_')[0];
-      
-      // Find the soldier ID
-      const soldierId = items[0].assignedToID;
-      
       // Create HandReceiptStatus records for each item
       for (const item of items) {
         try {
-          // Create or update the HandReceiptStatus record
+          // Create the HandReceiptStatus record
           await client.graphql({
             query: `mutation CreateHandReceiptStatus($input: CreateHandReceiptStatusInput!) {
               createHandReceiptStatus(input: $input) {
@@ -596,217 +199,88 @@ function Issue() {
             }`,
             variables: {
               input: {
-                receiptNumber,
+                receiptNumber: pdfFile.receiptNumber,
                 status: 'ISSUED',
                 fromUIC: uicID,
-                toSoldierID: soldierId, 
+                toSoldierID: item.assignedToID, 
                 equipmentItemID: item.id,
                 issuedOn: new Date().toISOString(),
                 pdfS3Key: s3Key
               }
             }
           });
-          
-          // Update local item status map
-          setItemStatusMap(prev => ({
-            ...prev,
-            [item.id]: {
-              status: 'HAND_RECEIPTED',
-              receiptNumber,
-              soldierId
-            }
-          }));
         } catch (error) {
           console.error(`Error creating HandReceiptStatus for item ${item.id}:`, error);
         }
       }
       
-      // Mark this receipt as issued
+      // Mark this receipt as issued in local state
       setReceiptActions(prev => ({
         ...prev,
         [pdfFile.name]: { ...prev[pdfFile.name], issued: true }
       }));
       
-      setSuccess(`${items.length} items have been issued and locked on hand receipt ${receiptNumber}.`);
+      // Refresh data ONLY after this explicit user action
+      refreshEquipmentData();
+      loadActiveHandReceipts(uicID);
+      
+      setSuccess(`${items.length} items have been issued and locked on hand receipt ${pdfFile.receiptNumber}.`);
     } catch (error) {
       console.error('Error marking items as issued:', error);
       setError('Failed to issue items. Please try again.');
-    } finally {
-      setProcessingAction(false);
-    }
-  };
-  
-  // Mark items as returned (update HandReceiptStatus records)
-  const handleMarkItemsReturned = async (pdfFile) => {
-    try {
-      setProcessingAction(true);
-      setError('');
-      
-      const items = getHandReceiptItems(pdfFile);
-      if (items.length === 0) {
-        setError('Could not find items for this receipt.');
-        return;
-      }
-      
-      // Extract receipt number from filename
-      const receiptNumber = pdfFile.name.split('_')[0];
-      
-      // Update HandReceiptStatus records for each item
-      for (const item of items) {
-        try {
-          // First, get the existing HandReceiptStatus record
-          const getStatusResponse = await client.graphql({
-            query: `query GetHandReceiptStatusByItemAndReceipt($receiptNumber: String!, $equipmentItemID: ID!) {
-              handReceiptStatusByReceiptNumber(receiptNumber: $receiptNumber) {
-                items {
-                  id
-                  receiptNumber
-                  status
-                  equipmentItemID
-                  _version
-                }
-              }
-            }`,
-            variables: {
-              receiptNumber,
-              equipmentItemID: item.id
-            }
-          });
-          
-          const statusRecords = getStatusResponse.data.handReceiptStatusByReceiptNumber.items
-            .filter(record => record.equipmentItemID === item.id && record.status === 'ISSUED');
-          
-          if (statusRecords.length === 0) {
-            console.warn(`No active HandReceiptStatus found for item ${item.id} on receipt ${receiptNumber}`);
-            continue;
-          }
-          
-          // Update the status record
-          const statusRecord = statusRecords[0];
-          await client.graphql({
-            query: `mutation UpdateHandReceiptStatus($input: UpdateHandReceiptStatusInput!) {
-              updateHandReceiptStatus(input: $input) {
-                id
-                receiptNumber
-                status
-                returnedOn
-              }
-            }`,
-            variables: {
-              input: {
-                id: statusRecord.id,
-                status: 'RETURNED',
-                returnedOn: new Date().toISOString(),
-                _version: statusRecord._version
-              }
-            }
-          });
-          
-          // Update local item status map
-          setItemStatusMap(prev => ({
-            ...prev,
-            [item.id]: null // Remove status to indicate item is no longer on hand receipt
-          }));
-        } catch (error) {
-          console.error(`Error updating HandReceiptStatus for item ${item.id}:`, error);
-        }
-      }
-      
-      // Mark this receipt as returned
-      setReceiptActions(prev => ({
-        ...prev,
-        [pdfFile.name]: { ...prev[pdfFile.name], returned: true }
-      }));
-      
-      setSuccess(`${items.length} items have been returned and released from hand receipt ${receiptNumber}.`);
-    } catch (error) {
-      console.error('Error marking items as returned:', error);
-      setError('Failed to return items. Please try again.');
-    } finally {
-      setProcessingAction(false);
     }
   };
 
-  // Add this function to load existing hand receipt statuses
-  const loadHandReceiptStatuses = async (uicId) => {
+  // Handle PDF generation - explicit user action
+  const handleGeneratePdfs = async () => {
     try {
-      // Define the query to accept a filter variable
-      const query = `query GetHandReceiptStatusesByUIC(
-        $fromUIC: ID!, 
-        $filter: ModelHandReceiptStatusFilterInput
-      ) {
-        handReceiptStatusesByFromUIC(
-          fromUIC: $fromUIC,
-          filter: $filter
-        ) {
-          items {
-            id
-            receiptNumber
-            status
-            fromUIC
-            toSoldierID
-            equipmentItemID
-            issuedOn
-            pdfS3Key
-          }
-        }
-      }`;
+      if (selectedItems.length === 0) {
+        setError('Please select at least one item to generate hand receipts.');
+        return;
+      }
       
-      // Define the filter object separately
-      const filter = {
-        status: { ne: "RETURNED" } // GraphQL client will handle enum conversion here
-      };
+      setError('');
+      setSuccess('');
       
-      // Pass filter in the variables object
-      const response = await client.graphql({
-        query,
-        variables: { 
-          fromUIC: uicId, 
-          filter: filter 
-        }
-      });
+      const pdfFiles = await generatePdfs(selectedItems, soldiersMap);
       
-      const statusRecords = response.data.handReceiptStatusesByFromUIC.items;
-      
-      // Build item status map
-      const statusMap = {};
-      const actionsMap = {};
-      
-      statusRecords.forEach(record => {
-        // Add to item status map for locking items
-        if (record.status === 'ISSUED') {
-          statusMap[record.equipmentItemID] = {
-            status: 'HAND_RECEIPTED',
-            receiptNumber: record.receiptNumber,
-            soldierId: record.toSoldierID
-          };
-          
-          // Track receipt actions status
-          const soldier = soldiersMap[record.toSoldierID];
-          if (soldier) {
-            const lastName = soldier.lastName;
-            const firstName = soldier.firstName;
-            const pdfName = `${record.receiptNumber}_${lastName}_${firstName}.pdf`;
-            
-            // Mark the receipt as downloaded and issued since it's already in the system
-            actionsMap[pdfName] = {
-              downloaded: true,
-              issued: true,
-              returned: false
-            };
-          }
-        }
-      });
-      
-      setItemStatusMap(statusMap);
-      setReceiptActions(actionsMap);
-      
-      return statusRecords;
+      setSuccess(`Generated ${pdfFiles.length} hand receipt${pdfFiles.length !== 1 ? 's' : ''}.`);
     } catch (error) {
-      console.error('Error loading hand receipt statuses:', error);
-      return [];
+      console.error('Error generating PDFs:', error);
+      setError('Failed to generate hand receipts: ' + error.message);
     }
   };
+
+  // Handle downloading PDF - user action, no data refetch needed
+  const handleDownloadPdf = (pdfFile) => {
+    downloadPdf(pdfFile);
+    
+    // Mark this PDF as downloaded so the Items Issued button can be enabled
+    setReceiptActions(prev => ({
+      ...prev,
+      [pdfFile.name]: { ...prev[pdfFile.name], downloaded: true }
+    }));
+  };
+
+  // View active hand receipt PDF - user action, no data refetch needed
+  const handleViewActivePdf = async (receipt) => {
+    try {
+      if (!receipt.pdfS3Key) {
+        setError('PDF not found for this receipt.');
+        return;
+      }
+      
+      const pdfUrl = await getHandReceiptPdf(receipt.pdfS3Key);
+      if (pdfUrl) {
+        window.open(pdfUrl, '_blank');
+      }
+    } catch (error) {
+      console.error('Error viewing PDF:', error);
+      setError('Failed to view PDF. Please try again.');
+    }
+  };
+
+  const filteredEquipment = getFilteredEquipment();
 
   return (
     <div className="page-container">
@@ -864,7 +338,7 @@ function Issue() {
             <div className="action-buttons">
               <button 
                 className="primary-button"
-                onClick={generatePdfs}
+                onClick={handleGeneratePdfs}
                 disabled={selectedItems.length === 0 || generating}
               >
                 {generating ? 'Generating...' : 'Generate Hand Receipts'}
@@ -890,7 +364,31 @@ function Issue() {
               <div className="equipment-list">
                 <div className="equipment-table">
                   <div className="equipment-table-header">
-                    <div className="checkbox-cell"></div>
+                    <div className="checkbox-cell">
+                      <input 
+                        type="checkbox" 
+                        checked={filteredEquipment.length > 0 && 
+                                filteredEquipment.every(item => selectedItems.some(selected => selected.id === item.id))}
+                        onChange={() => {
+                          // If all visible items are selected, deselect them
+                          if (filteredEquipment.every(item => selectedItems.some(selected => selected.id === item.id))) {
+                            // Remove all currently visible items from selection
+                            setSelectedItems(selectedItems.filter(selected => 
+                              !filteredEquipment.some(item => item.id === selected.id)
+                            ));
+                          } else {
+                            // Add all currently visible items to selection
+                            const visibleItemsToAdd = filteredEquipment.filter(item => 
+                              !selectedItems.some(selected => selected.id === item.id) &&
+                              // Don't select items that are on hand receipts
+                              !(itemStatusMap[item.id] && itemStatusMap[item.id].status === 'HAND_RECEIPTED')
+                            );
+                            
+                            setSelectedItems([...selectedItems, ...visibleItemsToAdd]);
+                          }
+                        }}
+                      />
+                    </div>
                     <div className="equipment-name">Item</div>
                     <div className="equipment-nsn">NSN</div>
                     <div className="equipment-serial">Serial #</div>
@@ -1027,7 +525,6 @@ function Issue() {
                   const receiptState = receiptActions[pdf.name] || {};
                   const isDownloaded = receiptState.downloaded;
                   const isIssued = receiptState.issued;
-                  const isReturned = receiptState.returned;
 
                   return (
                     <div key={index} className="pdf-item">
@@ -1035,7 +532,7 @@ function Issue() {
                       <div className="pdf-actions">
                         <button 
                           className="download-button"
-                          onClick={() => downloadPdf(pdf)}
+                          onClick={() => handleDownloadPdf(pdf)}
                         >
                           Download
                         </button>
@@ -1047,14 +544,6 @@ function Issue() {
                         >
                           Items Issued
                         </button>
-                        
-                        <button 
-                          className={`return-button ${isIssued && !isReturned ? 'active' : ''}`}
-                          onClick={() => handleMarkItemsReturned(pdf)}
-                          disabled={!isIssued || isReturned || processingAction}
-                        >
-                          Items Returned
-                        </button>
                       </div>
                     </div>
                   );
@@ -1062,6 +551,15 @@ function Issue() {
               </div>
             </div>
           )}
+          
+          {/* Add Active Hand Receipts component */}
+          <ActiveHandReceipts 
+            activeHandReceipts={activeHandReceipts}
+            onViewPdf={handleViewActivePdf}
+            onReturnItems={returnHandReceipt}
+            onReturnSingleItem={returnHandReceiptItem}
+            processingAction={processingAction}
+          />
         </div>
       )}
     </div>

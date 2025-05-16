@@ -308,23 +308,23 @@
 }
 
 .issue-button.active {
-  background-color: #4CAF50;
+  background-color: #282c34;
   color: white;
   cursor: pointer;
   opacity: 1;
 }
 
 .issue-button.active:hover {
-  background-color: #45a049;
+  background-color: #1e2228;
 }
 
 .return-button.active {
-  background-color: #f44336;
+  background-color: #6c778d;
   color: white;
   cursor: pointer;
   opacity: 1;
 }
 
 .return-button.active:hover {
-  background-color: #d32f2f;
+  background-color: #5a6476;
 } 
