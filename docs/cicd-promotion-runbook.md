@@ -43,6 +43,14 @@ If using the AWS CLI instead of the Amplify Console connection flow:
 
 The helper connects app `d14zgqyeayi7ji` to `https://github.com/azadian2b/supplysgt`, attaches branch `main` to the existing `dev` backend environment, uses `AmplifyConsoleServiceRole-AmplifyRole`, and starts a release job. It does not move the custom domain.
 
+If AWS returns `Cannot connect your app to repository while manually deployed branch still exists`, do not delete the live `dev` branch unless downtime is acceptable. Use the safer blue/green helper instead:
+
+```powershell
+.\scripts\create-amplify-git-app.ps1 -StartBuild
+```
+
+This creates a separate Git-connected Amplify app, generates `src/aws-exports.js` during CI from environment variables that point to the existing live backend, and leaves the current manual app serving `supplysgt.net` until the new app is validated.
+
 ## Pre-cutover checks
 
 - `npm ci`

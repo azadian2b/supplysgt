@@ -24,7 +24,17 @@ function Invoke-AwsCli {
 
     & $AwsCli @Arguments
     if ($LASTEXITCODE -ne 0) {
-        throw "aws $($Arguments -join ' ') failed with exit code $LASTEXITCODE"
+        $safeArguments = for ($index = 0; $index -lt $Arguments.Count; $index++) {
+            if ($Arguments[$index] -in @("--access-token", "--oauth-token")) {
+                $index++
+                "<redacted>"
+            }
+            else {
+                $Arguments[$index]
+            }
+        }
+
+        throw "aws $($safeArguments -join ' ') failed with exit code $LASTEXITCODE"
     }
 }
 
