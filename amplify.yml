@@ -3,12 +3,13 @@ backend:
   phases:
     build:
       commands:
-        - amplifyPush --simple
+        - if [ "$SKIP_AMPLIFY_PUSH" != "true" ]; then amplifyPush --simple; fi
 frontend:
   phases:
     preBuild:
       commands:
         - npm ci
+        - if [ "$GENERATE_AWS_EXPORTS" = "true" ]; then node scripts/write-aws-exports.js; fi
     build:
       commands:
         - CI=true npm test -- --watchAll=false
