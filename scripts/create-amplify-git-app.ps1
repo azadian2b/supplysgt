@@ -56,6 +56,14 @@ $environmentVariables = @{
     AWS_USER_FILES_S3_BUCKET_REGION = "us-east-1"
 } | ConvertTo-Json -Compress
 
+$buildSpecFile = New-TemporaryFile
+$environmentVariablesFile = New-TemporaryFile
+Set-Content -LiteralPath $buildSpecFile.FullName -Value $buildSpec -NoNewline
+Set-Content -LiteralPath $environmentVariablesFile.FullName -Value $environmentVariables -NoNewline
+
+$buildSpecFileUri = "file://$($buildSpecFile.FullName -replace '\\', '/')"
+$environmentVariablesFileUri = "file://$($environmentVariablesFile.FullName -replace '\\', '/')"
+
 Write-Host "Create a new Git-connected Amplify app for $Repository."
 Write-Host "Use a fresh GitHub classic PAT with admin:repo_hook scope. Do not reuse a token that appeared in chat or terminal logs."
 
@@ -74,8 +82,8 @@ try {
         --access-token $token `
         --iam-service-role-arn $ServiceRoleArn `
         --enable-branch-auto-build `
-        --environment-variables $environmentVariables `
-        --build-spec $buildSpec `
+        --environment-variables $environmentVariablesFileUri `
+        --build-spec $buildSpecFileUri `
         --output json
 
     if ($LASTEXITCODE -ne 0) {
@@ -88,6 +96,8 @@ finally {
     }
     Remove-Variable token -ErrorAction SilentlyContinue
     Remove-Variable secureToken -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $buildSpecFile.FullName -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $environmentVariablesFile.FullName -Force -ErrorAction SilentlyContinue
 }
 
 $app = ($appJson | ConvertFrom-Json).app
