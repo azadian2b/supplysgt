@@ -29,6 +29,20 @@
 6. Add `develop` after production is green and after a separate development backend environment exists. Use the Amplify default branch domain or `dev.supplysgt.net`.
 7. Keep the previous manual-hosting deployment available as rollback until the Git-connected production branch is verified.
 
+### CLI/PAT connection helper
+
+If using the AWS CLI instead of the Amplify Console connection flow:
+
+1. Install the AWS Amplify GitHub App for `us-east-1` and grant it access to `azadian2b/supplysgt`.
+2. Generate a GitHub classic PAT with `admin:repo_hook` scope.
+3. Run:
+
+   ```powershell
+   .\scripts\connect-amplify-github.ps1 -StartBuild
+   ```
+
+The helper connects app `d14zgqyeayi7ji` to `https://github.com/azadian2b/supplysgt`, attaches branch `main` to the existing `dev` backend environment, uses `AmplifyConsoleServiceRole-AmplifyRole`, and starts a release job. It does not move the custom domain.
+
 ## Pre-cutover checks
 
 - `npm ci`
