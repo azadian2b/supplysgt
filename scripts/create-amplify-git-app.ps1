@@ -41,20 +41,28 @@ $buildSpec = Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot "..\amplify.
 $environmentVariables = @{
     GENERATE_AWS_EXPORTS = "true"
     SKIP_AMPLIFY_PUSH = "true"
-    AWS_PROJECT_REGION = "us-east-1"
-    AWS_COGNITO_IDENTITY_POOL_ID = "us-east-1:412f871c-97a9-4e1f-95a5-2b362307a24e"
-    AWS_COGNITO_REGION = "us-east-1"
-    AWS_USER_POOLS_ID = "us-east-1_GzkyUvzWd"
-    AWS_USER_POOLS_WEB_CLIENT_ID = "6orvthkmh7hmusd7iao6it08eu"
-    AWS_APPSYNC_GRAPHQL_ENDPOINT = "https://6ckwzr4phzafpfscbcrlux77hu.appsync-api.us-east-1.amazonaws.com/graphql"
-    AWS_APPSYNC_REGION = "us-east-1"
-    AWS_APPSYNC_AUTHENTICATION_TYPE = "AMAZON_COGNITO_USER_POOLS"
-    AWS_DYNAMODB_ALL_TABLES_REGION = "us-east-1"
-    AWS_DYNAMODB_TABLE_NAME = "dynamo4062985a-dev"
-    AWS_DYNAMODB_TABLE_REGION = "us-east-1"
-    AWS_USER_FILES_S3_BUCKET = "supplysgtapp143c061359bc4407bdefc8dd9b6c476ea792b-dev"
-    AWS_USER_FILES_S3_BUCKET_REGION = "us-east-1"
+    SSGT_PROJECT_REGION = "us-east-1"
+    SSGT_COGNITO_IDENTITY_POOL_ID = "us-east-1:412f871c-97a9-4e1f-95a5-2b362307a24e"
+    SSGT_COGNITO_REGION = "us-east-1"
+    SSGT_USER_POOLS_ID = "us-east-1_GzkyUvzWd"
+    SSGT_USER_POOLS_WEB_CLIENT_ID = "6orvthkmh7hmusd7iao6it08eu"
+    SSGT_APPSYNC_GRAPHQL_ENDPOINT = "https://6ckwzr4phzafpfscbcrlux77hu.appsync-api.us-east-1.amazonaws.com/graphql"
+    SSGT_APPSYNC_REGION = "us-east-1"
+    SSGT_APPSYNC_AUTHENTICATION_TYPE = "AMAZON_COGNITO_USER_POOLS"
+    SSGT_DYNAMODB_ALL_TABLES_REGION = "us-east-1"
+    SSGT_DYNAMODB_TABLE_NAME = "dynamo4062985a-dev"
+    SSGT_DYNAMODB_TABLE_REGION = "us-east-1"
+    SSGT_USER_FILES_S3_BUCKET = "supplysgtapp143c061359bc4407bdefc8dd9b6c476ea792b-dev"
+    SSGT_USER_FILES_S3_BUCKET_REGION = "us-east-1"
 } | ConvertTo-Json -Compress
+
+$buildSpecFile = New-TemporaryFile
+$environmentVariablesFile = New-TemporaryFile
+Set-Content -LiteralPath $buildSpecFile.FullName -Value $buildSpec -NoNewline
+Set-Content -LiteralPath $environmentVariablesFile.FullName -Value $environmentVariables -NoNewline
+
+$buildSpecFileUri = "file://$($buildSpecFile.FullName -replace '\\', '/')"
+$environmentVariablesFileUri = "file://$($environmentVariablesFile.FullName -replace '\\', '/')"
 
 Write-Host "Create a new Git-connected Amplify app for $Repository."
 Write-Host "Use a fresh GitHub classic PAT with admin:repo_hook scope. Do not reuse a token that appeared in chat or terminal logs."
@@ -74,8 +82,8 @@ try {
         --access-token $token `
         --iam-service-role-arn $ServiceRoleArn `
         --enable-branch-auto-build `
-        --environment-variables $environmentVariables `
-        --build-spec $buildSpec `
+        --environment-variables $environmentVariablesFileUri `
+        --build-spec $buildSpecFileUri `
         --output json
 
     if ($LASTEXITCODE -ne 0) {
@@ -88,6 +96,8 @@ finally {
     }
     Remove-Variable token -ErrorAction SilentlyContinue
     Remove-Variable secureToken -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $buildSpecFile.FullName -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $environmentVariablesFile.FullName -Force -ErrorAction SilentlyContinue
 }
 
 $app = ($appJson | ConvertFrom-Json).app

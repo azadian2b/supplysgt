@@ -1,33 +1,48 @@
 const fs = require('fs');
 const path = require('path');
 
-const required = [
-  'AWS_PROJECT_REGION',
-  'AWS_COGNITO_IDENTITY_POOL_ID',
-  'AWS_COGNITO_REGION',
-  'AWS_USER_POOLS_ID',
-  'AWS_USER_POOLS_WEB_CLIENT_ID',
-  'AWS_APPSYNC_GRAPHQL_ENDPOINT',
-  'AWS_APPSYNC_REGION',
-  'AWS_APPSYNC_AUTHENTICATION_TYPE',
-  'AWS_USER_FILES_S3_BUCKET',
-  'AWS_USER_FILES_S3_BUCKET_REGION',
-];
+const mappings = {
+  projectRegion: ['SSGT_PROJECT_REGION', 'AWS_PROJECT_REGION'],
+  cognitoIdentityPoolId: ['SSGT_COGNITO_IDENTITY_POOL_ID', 'AWS_COGNITO_IDENTITY_POOL_ID'],
+  cognitoRegion: ['SSGT_COGNITO_REGION', 'AWS_COGNITO_REGION'],
+  userPoolsId: ['SSGT_USER_POOLS_ID', 'AWS_USER_POOLS_ID'],
+  userPoolsWebClientId: ['SSGT_USER_POOLS_WEB_CLIENT_ID', 'AWS_USER_POOLS_WEB_CLIENT_ID'],
+  appsyncGraphqlEndpoint: ['SSGT_APPSYNC_GRAPHQL_ENDPOINT', 'AWS_APPSYNC_GRAPHQL_ENDPOINT'],
+  appsyncRegion: ['SSGT_APPSYNC_REGION', 'AWS_APPSYNC_REGION'],
+  appsyncAuthenticationType: ['SSGT_APPSYNC_AUTHENTICATION_TYPE', 'AWS_APPSYNC_AUTHENTICATION_TYPE'],
+  userFilesS3Bucket: ['SSGT_USER_FILES_S3_BUCKET', 'AWS_USER_FILES_S3_BUCKET'],
+  userFilesS3BucketRegion: ['SSGT_USER_FILES_S3_BUCKET_REGION', 'AWS_USER_FILES_S3_BUCKET_REGION'],
+};
 
-const missing = required.filter((key) => !process.env[key]);
+function envValue(names) {
+  return names.map((name) => process.env[name]).find(Boolean);
+}
+
+const config = Object.fromEntries(
+  Object.entries(mappings).map(([key, names]) => [key, envValue(names)])
+);
+
+const missing = Object.entries(mappings)
+  .filter(([key]) => !config[key])
+  .map(([, names]) => names[0]);
 
 if (missing.length > 0) {
   throw new Error(`Missing aws-exports environment variables: ${missing.join(', ')}`);
 }
 
-const dynamoTableName = process.env.AWS_DYNAMODB_TABLE_NAME;
+const projectRegion = config.projectRegion;
+const dynamoTableName = process.env.SSGT_DYNAMODB_TABLE_NAME || process.env.AWS_DYNAMODB_TABLE_NAME;
+const dynamoTablesRegion =
+  process.env.SSGT_DYNAMODB_ALL_TABLES_REGION || process.env.AWS_DYNAMODB_ALL_TABLES_REGION || projectRegion;
+const dynamoTableRegion =
+  process.env.SSGT_DYNAMODB_TABLE_REGION || process.env.AWS_DYNAMODB_TABLE_REGION || projectRegion;
 
 const awsmobile = {
-  aws_project_region: process.env.AWS_PROJECT_REGION,
-  aws_cognito_identity_pool_id: process.env.AWS_COGNITO_IDENTITY_POOL_ID,
-  aws_cognito_region: process.env.AWS_COGNITO_REGION,
-  aws_user_pools_id: process.env.AWS_USER_POOLS_ID,
-  aws_user_pools_web_client_id: process.env.AWS_USER_POOLS_WEB_CLIENT_ID,
+  aws_project_region: projectRegion,
+  aws_cognito_identity_pool_id: config.cognitoIdentityPoolId,
+  aws_cognito_region: config.cognitoRegion,
+  aws_user_pools_id: config.userPoolsId,
+  aws_user_pools_web_client_id: config.userPoolsWebClientId,
   oauth: {},
   aws_cognito_username_attributes: ['EMAIL'],
   aws_cognito_social_providers: [],
@@ -39,20 +54,20 @@ const awsmobile = {
     passwordPolicyCharacters: [],
   },
   aws_cognito_verification_mechanisms: ['EMAIL'],
-  aws_appsync_graphqlEndpoint: process.env.AWS_APPSYNC_GRAPHQL_ENDPOINT,
-  aws_appsync_region: process.env.AWS_APPSYNC_REGION,
-  aws_appsync_authenticationType: process.env.AWS_APPSYNC_AUTHENTICATION_TYPE,
-  aws_dynamodb_all_tables_region: process.env.AWS_DYNAMODB_ALL_TABLES_REGION || process.env.AWS_PROJECT_REGION,
+  aws_appsync_graphqlEndpoint: config.appsyncGraphqlEndpoint,
+  aws_appsync_region: config.appsyncRegion,
+  aws_appsync_authenticationType: config.appsyncAuthenticationType,
+  aws_dynamodb_all_tables_region: dynamoTablesRegion,
   aws_dynamodb_table_schemas: dynamoTableName
     ? [
         {
           tableName: dynamoTableName,
-          region: process.env.AWS_DYNAMODB_TABLE_REGION || process.env.AWS_PROJECT_REGION,
+          region: dynamoTableRegion,
         },
       ]
     : [],
-  aws_user_files_s3_bucket: process.env.AWS_USER_FILES_S3_BUCKET,
-  aws_user_files_s3_bucket_region: process.env.AWS_USER_FILES_S3_BUCKET_REGION,
+  aws_user_files_s3_bucket: config.userFilesS3Bucket,
+  aws_user_files_s3_bucket_region: config.userFilesS3BucketRegion,
 };
 
 const outputPath = path.join(__dirname, '..', 'src', 'aws-exports.js');
