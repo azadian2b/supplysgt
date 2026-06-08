@@ -49,7 +49,7 @@ If AWS returns `Cannot connect your app to repository while manually deployed br
 .\scripts\create-amplify-git-app.ps1 -StartBuild
 ```
 
-This creates a separate Git-connected frontend-only Amplify app, generates `src/aws-exports.js` during CI from environment variables that point to the existing live backend, and leaves the current manual app serving `supplysgt.net` until the new app is validated. Do not include a Gen 1 `backend:` phase in this blue/green app's build spec, because that causes Amplify to create a fresh backend environment instead of using the preserved live backend.
+This creates a separate Git-connected frontend-only Amplify app, sets `AMPLIFY_SKIP_BACKEND_BUILD=true`, generates `src/aws-exports.js` during CI from environment variables that point to the existing live backend, and leaves the current manual app serving `supplysgt.net` until the new app is validated. Do not include a Gen 1 `backend:` phase in this blue/green app's build spec, because that causes Amplify to create a fresh backend environment instead of using the preserved live backend.
 
 ## Pre-cutover checks
 
