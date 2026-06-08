@@ -63,7 +63,7 @@ function Invoke-GitHubGet {
 
 Write-Host "Paste the same GitHub PAT you plan to use for Amplify. The token will not be printed."
 $secureToken = Read-Host "GitHub PAT" -AsSecureString
-$token = Convert-SecureStringToPlainText -SecureString $secureToken
+$token = (Convert-SecureStringToPlainText -SecureString $secureToken).Trim()
 
 try {
     $repoResult = Invoke-GitHubGet -Path "/repos/$Owner/$Repo" -Token $token
