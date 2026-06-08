@@ -39,8 +39,8 @@ function Invoke-AwsCli {
 
 $buildSpec = Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot "..\amplify.yml")
 $environmentVariables = @{
+    AMPLIFY_SKIP_BACKEND_BUILD = "true"
     GENERATE_AWS_EXPORTS = "true"
-    SKIP_AMPLIFY_PUSH = "true"
     SSGT_PROJECT_REGION = "us-east-1"
     SSGT_COGNITO_IDENTITY_POOL_ID = "us-east-1:412f871c-97a9-4e1f-95a5-2b362307a24e"
     SSGT_COGNITO_REGION = "us-east-1"

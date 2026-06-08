@@ -47,6 +47,7 @@ function Invoke-GitHubGet {
             Success = $true
             Message = "OK"
             Headers = $response.Headers
+            Body = $response.Content
         }
     }
     catch {
@@ -57,23 +58,41 @@ function Invoke-GitHubGet {
             Success = $false
             Message = $_.Exception.Message
             Headers = $_.Exception.Response.Headers
+            Body = $null
         }
     }
 }
 
 Write-Host "Paste the same GitHub PAT you plan to use for Amplify. The token will not be printed."
 $secureToken = Read-Host "GitHub PAT" -AsSecureString
-$token = Convert-SecureStringToPlainText -SecureString $secureToken
+$token = (Convert-SecureStringToPlainText -SecureString $secureToken).Trim()
 
 try {
+    $userResult = Invoke-GitHubGet -Path "/user" -Token $token
     $repoResult = Invoke-GitHubGet -Path "/repos/$Owner/$Repo" -Token $token
     $hookResult = Invoke-GitHubGet -Path "/repos/$Owner/$Repo/hooks" -Token $token
 
     Write-Host ""
+    Write-Host "GitHub user access:  $($userResult.StatusCode) $($userResult.Message)"
     Write-Host "GitHub repo access:  $($repoResult.StatusCode) $($repoResult.Message)"
     Write-Host "GitHub hook access:  $($hookResult.StatusCode) $($hookResult.Message)"
 
-    $scopes = $hookResult.Headers["X-OAuth-Scopes"]
+    if ($userResult.Success -and $userResult.Body) {
+        $user = $userResult.Body | ConvertFrom-Json
+        Write-Host "Token user:          $($user.login)"
+    }
+
+    if ($repoResult.Success -and $repoResult.Body) {
+        $repoInfo = $repoResult.Body | ConvertFrom-Json
+        if ($repoInfo.permissions) {
+            Write-Host "Repo permissions:    admin=$($repoInfo.permissions.admin) maintain=$($repoInfo.permissions.maintain) push=$($repoInfo.permissions.push) pull=$($repoInfo.permissions.pull)"
+        }
+    }
+
+    $scopes = $userResult.Headers["X-OAuth-Scopes"]
+    if (-not $scopes) {
+        $scopes = $hookResult.Headers["X-OAuth-Scopes"]
+    }
     if (-not $scopes) {
         $scopes = $repoResult.Headers["X-OAuth-Scopes"]
     }
