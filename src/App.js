@@ -7,7 +7,6 @@ import './App.css';
 import './styles/Theme.css';
 import './styles/Buttons.css';
 import ProfilePage from './pages/ProfilePage';
-import UpdateNotification from './components/UpdateNotification';
 
 // Pages
 import Home from './pages/Home';
@@ -15,7 +14,7 @@ import Manage from './pages/Manage';
 import Assign from './pages/Assign';
 import Issue from './pages/Issue';
 import Accountability from './pages/Accountability';
-import DataInspector from './utils/DataInspector';
+import Admin from './pages/Admin';
 
 // Components
 import Header from './components/Header';
@@ -28,7 +27,7 @@ Amplify.configure(awsExports);
 // Navigation restoration component
 function NavigationRestorer() {
   const navigate = useNavigate();
-  
+
   useEffect(() => {
     const savedPath = sessionStorage.getItem('returnToPath');
     if (savedPath) {
@@ -38,13 +37,13 @@ function NavigationRestorer() {
       sessionStorage.removeItem('returnToPath');
     }
   }, [navigate]);
-  
+
   return null;
 }
 
 function App() {
   return (
-    <Authenticator 
+    <Authenticator
       services={{
         validateCustomSignUp: async (formData) => {
           if (!formData.email) {
@@ -68,13 +67,13 @@ function App() {
                 <Route path="/issue" element={<Issue />} />
                 <Route path="/accountability" element={<Accountability />} />
                 <Route path="/profile" element={<ProfilePage />} />
-                <Route path="/debug" element={<DataInspector />} />
+                <Route path="/admin" element={<Admin />} />
+                <Route path="/debug" element={<Navigate to="/admin" replace />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </main>
             <Footer />
           </div>
-          <UpdateNotification />
         </Router>
       )}
     </Authenticator>

@@ -3,8 +3,7 @@ import { generateClient } from 'aws-amplify/api';
 import { getCurrentUser } from 'aws-amplify/auth';
 import { getUrl } from 'aws-amplify/storage';
 import { createEquipmentGroup, updateEquipmentItem, deleteEquipmentGroup } from '../../graphql/mutations';
-import { equipmentItemsByUicID, equipmentGroupsByUicID, equipmentItemsByGroupID } from '../../graphql/queries';
-import { DataStore } from '@aws-amplify/datastore';
+import { equipmentItemsByGroupID } from '../../graphql/queries';
 import DataStoreUtil from '../../utils/DataStoreSync';
 import './Equipment.css';
 
@@ -19,41 +18,45 @@ function ManageGroupsModal3({ onBack }) {
   const [success, setSuccess] = useState('');
   const [uicID, setUicID] = useState(null);
   const [activeTab, setActiveTab] = useState('create'); // 'create', 'view', 'edit'
-  
+
   // Create group state
   const [availableItems, setAvailableItems] = useState([]);
   const [baseItem, setBaseItem] = useState(null);
   const [selectedComponents, setSelectedComponents] = useState([]);
   const [groupName, setGroupName] = useState('');
   const [groupDescription, setGroupDescription] = useState('');
-  
+
   // View groups state
   const [existingGroups, setExistingGroups] = useState([]);
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [groupItems, setGroupItems] = useState([]);
-  
+
   // UI state
   const [searchTerm, setSearchTerm] = useState('');
   const [itemType, setItemType] = useState('all'); // 'all', 'weapons', 'optics', 'comms', etc.
-  
+
   // Add state for confirm delete modal
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [groupToDelete, setGroupToDelete] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState('');
-  
+
   const client = generateClient();
 
   // Fetch data on component mount
   useEffect(() => {
     fetchInitialData();
+    // Initial modal load only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  
+
   // Fetch group items when a group is selected
   useEffect(() => {
     if (selectedGroup) {
       fetchGroupItems(selectedGroup.id);
     }
+    // Fetch group contents when the selected group changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedGroup]);
 
   /**
@@ -63,7 +66,7 @@ function ManageGroupsModal3({ onBack }) {
     try {
       setLoading(true);
       setError('');
-      
+
       // Get current user's UIC
       const { username } = await getCurrentUser();
       const userAttributes = await client.graphql({
@@ -77,19 +80,19 @@ function ManageGroupsModal3({ onBack }) {
         }`,
         variables: { owner: username }
       });
-      
+
       const userData = userAttributes.data.usersByOwner.items[0];
       if (!userData || !userData.uicID) {
         setError('You must be assigned to a UIC to manage equipment groups.');
         setLoading(false);
         return;
       }
-      
+
       setUicID(userData.uicID);
-      
+
       // Fetch available equipment items
       await fetchAvailableItems(userData.uicID);
-      
+
       // Fetch existing groups
       await fetchExistingGroups(userData.uicID);
     } catch (error) {
@@ -99,7 +102,7 @@ function ManageGroupsModal3({ onBack }) {
       setLoading(false);
     }
   };
-  
+
   /**
    * Fetches available equipment items (not in groups)
    */
@@ -109,7 +112,7 @@ function ManageGroupsModal3({ onBack }) {
         query: `query EquipmentItemsByUicID($uicID: ID!) {
           equipmentItemsByUicID(
             uicID: $uicID,
-            filter: { 
+            filter: {
               isPartOfGroup: { ne: true },
               _deleted: { ne: true }
             }
@@ -132,14 +135,14 @@ function ManageGroupsModal3({ onBack }) {
         }`,
         variables: { uicID: uicID }
       });
-      
+
       const equipmentItems = equipmentData.data.equipmentItemsByUicID.items;
-      
+
       // Double-check to ensure we only include items not already in groups
       const availableItems = equipmentItems.filter(item => !item.isPartOfGroup && !item.groupID);
-      
+
       console.log(`Fetched ${equipmentItems.length} items, ${availableItems.length} available (not in groups)`);
-      
+
       // Fetch additional details about each item
       const itemsWithDetails = await Promise.all(availableItems.map(async (item) => {
         try {
@@ -155,9 +158,9 @@ function ManageGroupsModal3({ onBack }) {
             }`,
             variables: { id: item.equipmentMasterID }
           });
-          
+
           const masterInfo = masterData.data.getEquipmentMaster;
-          
+
           // Get image URL if imageKey exists
           let imageUrl = null;
           if (masterInfo?.imageKey) {
@@ -173,7 +176,7 @@ function ManageGroupsModal3({ onBack }) {
               console.error('Error getting image URL:', err);
             }
           }
-          
+
           return {
             ...item,
             commonName: masterInfo?.commonName || `Item ${item.nsn}`,
@@ -193,14 +196,14 @@ function ManageGroupsModal3({ onBack }) {
           };
         }
       }));
-      
+
       setAvailableItems(itemsWithDetails);
     } catch (error) {
       console.error('Error fetching available items:', error);
       throw error;
     }
   };
-  
+
   /**
    * Fetches existing equipment groups
    */
@@ -225,9 +228,9 @@ function ManageGroupsModal3({ onBack }) {
         }`,
         variables: { uicID: uicID }
       });
-      
+
       const groups = groupsData.data.equipmentGroupsByUicID.items;
-      
+
       // For each group, get the number of items in it
       const groupsWithItemCounts = await Promise.all(groups.map(async (group) => {
         try {
@@ -244,9 +247,9 @@ function ManageGroupsModal3({ onBack }) {
             }`,
             variables: { groupID: group.id }
           });
-          
+
           const itemCount = countResponse.data.equipmentItemsByGroupID.items.length;
-          
+
           return {
             ...group,
             itemCount
@@ -259,28 +262,28 @@ function ManageGroupsModal3({ onBack }) {
           };
         }
       }));
-      
+
       setExistingGroups(groupsWithItemCounts);
     } catch (error) {
       console.error('Error fetching groups:', error);
       throw error;
     }
   };
-  
+
   /**
    * Fetches items belonging to a specific group
    */
   const fetchGroupItems = async (groupID) => {
     try {
       setLoading(true);
-      
+
       const response = await client.graphql({
         query: equipmentItemsByGroupID,
         variables: { groupID: groupID }
       });
-      
+
       const items = response.data.equipmentItemsByGroupID.items;
-      
+
       // Fetch additional details for each item
       const itemsWithDetails = await Promise.all(items.map(async (item) => {
         try {
@@ -295,9 +298,9 @@ function ManageGroupsModal3({ onBack }) {
             }`,
             variables: { id: item.equipmentMasterID }
           });
-          
+
           const masterInfo = masterData.data.getEquipmentMaster;
-          
+
           // Get image URL if imageKey exists
           let imageUrl = null;
           if (masterInfo?.imageKey) {
@@ -313,7 +316,7 @@ function ManageGroupsModal3({ onBack }) {
               console.error('Error getting image URL:', err);
             }
           }
-          
+
           return {
             ...item,
             commonName: masterInfo?.commonName || `Item ${item.nsn}`,
@@ -327,7 +330,7 @@ function ManageGroupsModal3({ onBack }) {
           };
         }
       }));
-      
+
       setGroupItems(itemsWithDetails);
     } catch (error) {
       console.error('Error fetching group items:', error);
@@ -336,14 +339,14 @@ function ManageGroupsModal3({ onBack }) {
       setLoading(false);
     }
   };
-  
+
   /**
    * Determines item type based on name and description
    * This is used for categorizing items in the UI
    */
   const determineItemType = (name, description) => {
     const text = (name + ' ' + description).toLowerCase();
-    
+
     if (/rifle|pistol|launcher|gun|m4|m16|m249|weapon/.test(text)) return 'weapons';
     if (/optic|sight|scope|acog|eotech|aimpoint/.test(text)) return 'optics';
     if (/radio|comms|communications|sincgars|antenna/.test(text)) return 'comms';
@@ -351,10 +354,10 @@ function ManageGroupsModal3({ onBack }) {
     if (/mount|rail|attachment/.test(text)) return 'attachments';
     if (/ammo|magazine|cartridge|round/.test(text)) return 'ammo';
     if (/case|bag|carrier|pouch/.test(text)) return 'storage';
-    
+
     return 'other';
   };
-  
+
   /**
    * Handles selecting a base item
    */
@@ -364,22 +367,22 @@ function ManageGroupsModal3({ onBack }) {
     const stockPrefix = item.stockNumber ? `${item.stockNumber} - ` : '';
     setGroupName(`${stockPrefix}${item.commonName} Set`);
   };
-  
+
   /**
    * Handles toggling a component item
    */
   const handleToggleComponent = (item) => {
     if (baseItem && item.id === baseItem.id) return; // Can't select base item as component
-    
+
     const isSelected = selectedComponents.some(i => i.id === item.id);
-    
+
     if (isSelected) {
       setSelectedComponents(selectedComponents.filter(i => i.id !== item.id));
     } else {
       setSelectedComponents([...selectedComponents, item]);
     }
   };
-  
+
   /**
    * Sync the changes to the local DataStore
    */
@@ -388,27 +391,23 @@ function ManageGroupsModal3({ onBack }) {
       console.log('In offline mode - changes will not be synced to DataStore');
       return;
     }
-    
+
     try {
-      // Import the models
-      const { EquipmentGroup, EquipmentItem } = await import('../../models');
-      
-      // For each modified item, update it in DataStore
       console.log('Syncing changes to local DataStore...');
-      
+
       // The DataStore will naturally sync with the backend on its next sync cycle
       // but we can manually trigger saves for specific items we've modified
-      
+
       // For now, let's just trigger a global sync for simplicity
       await DataStoreUtil.clearAndSync();
-      
+
       console.log('DataStore sync completed');
     } catch (error) {
       console.error('Error syncing changes to DataStore:', error);
       // We won't block the UI for this error since the changes have been saved to the backend
     }
   };
-  
+
   /**
    * Creates a new equipment group
    */
@@ -417,16 +416,16 @@ function ManageGroupsModal3({ onBack }) {
       setError('Please select a base item for this group.');
       return;
     }
-    
+
     if (!groupName.trim()) {
       setError('Please enter a name for this group.');
       return;
     }
-    
+
     try {
       setLoading(true);
       setError('');
-      
+
       // Add stock number to group name if not already included
       if (baseItem.stockNumber && !groupName.includes(baseItem.stockNumber)) {
         const stockPrefix = `${baseItem.stockNumber} - `;
@@ -434,7 +433,7 @@ function ManageGroupsModal3({ onBack }) {
           setGroupName(`${stockPrefix}${groupName}`);
         }
       }
-      
+
       // Create the group
       const createResponse = await client.graphql({
         query: createEquipmentGroup,
@@ -446,9 +445,9 @@ function ManageGroupsModal3({ onBack }) {
           }
         }
       });
-      
+
       const newGroup = createResponse.data.createEquipmentGroup;
-      
+
       // Function to update an item with conflict handling
       const updateItemWithRetry = async (item) => {
         try {
@@ -469,7 +468,7 @@ function ManageGroupsModal3({ onBack }) {
           // If there's a conflict error
           if (error.errors && error.errors.some(e => e.errorType === "ConflictUnhandled")) {
             console.log(`Version conflict for item ${item.id}, fetching latest version...`);
-            
+
             // Get the latest version of the item
             try {
               const response = await client.graphql({
@@ -483,15 +482,15 @@ function ManageGroupsModal3({ onBack }) {
                 }`,
                 variables: { id: item.id }
               });
-              
+
               const latestItem = response.data.getEquipmentItem;
-              
+
               // If item is already part of a group, skip it
               if (latestItem.isPartOfGroup && latestItem.groupID) {
                 console.log(`Item ${item.id} is already part of a group, skipping...`);
                 return false;
               }
-              
+
               // Try update again with the latest version
               await client.graphql({
                 query: updateEquipmentItem,
@@ -510,44 +509,41 @@ function ManageGroupsModal3({ onBack }) {
               return false;
             }
           }
-          
+
           console.error(`Error updating item ${item.id}:`, error);
           return false;
         }
       };
-      
+
       // Update base item
       const baseItemUpdated = await updateItemWithRetry(baseItem);
       if (!baseItemUpdated) {
         setError('Failed to add base item to group. The item may have been modified by another user.');
       }
-      
+
       // Update component items
-      let componentsUpdated = 0;
       let componentsFailed = 0;
-      
+
       for (const component of selectedComponents) {
         const success = await updateItemWithRetry(component);
-        if (success) {
-          componentsUpdated++;
-        } else {
+        if (!success) {
           componentsFailed++;
         }
       }
-      
+
       // Show success message with warnings if some items failed
       let successMessage = `Successfully created equipment group "${groupName}"`;
       if (componentsFailed > 0) {
         successMessage += `. Note: ${componentsFailed} out of ${selectedComponents.length} components could not be added to the group.`;
       }
       setSuccess(successMessage);
-      
+
       // Sync changes to local DataStore
       await syncChangesToDataStore();
-      
+
       // Reset form but stay on create tab and keep success message
       handleResetCreateForm();
-      
+
       // Refresh available items
       fetchAvailableItems(uicID);
       fetchExistingGroups(uicID);
@@ -558,7 +554,7 @@ function ManageGroupsModal3({ onBack }) {
       setLoading(false);
     }
   };
-  
+
   /**
    * Reset the create form
    */
@@ -570,51 +566,51 @@ function ManageGroupsModal3({ onBack }) {
     setSearchTerm('');
     setItemType('all');
   };
-  
+
   /**
    * Filter items based on search term and item type
    */
   const filteredItems = availableItems.filter(item => {
     const searchLower = searchTerm.toLowerCase();
-    const matchesSearch = 
+    const matchesSearch =
       item.lin?.toLowerCase().includes(searchLower) ||
       item.nsn?.toLowerCase().includes(searchLower) ||
       item.serialNumber?.toLowerCase().includes(searchLower) ||
       item.commonName?.toLowerCase().includes(searchLower);
-      
+
     const matchesType = itemType === 'all' || item.type === itemType;
-    
+
     return matchesSearch && matchesType;
   });
-  
+
   /**
    * Calculate completion status for UI progress indicator
    */
   const completionStatus = () => {
     let steps = 0;
     let completed = 0;
-    
+
     // Step 1: Base item
     steps++;
     if (baseItem) completed++;
-    
+
     // Step 2: Group name
     steps++;
     if (groupName.trim()) completed++;
-    
+
     // Step 3: At least one component (optional)
     if (selectedComponents.length > 0) {
       steps++;
       completed++;
     }
-    
+
     return {
       percent: Math.round((completed / steps) * 100),
       completed,
       total: steps
     };
   };
-  
+
   const status = completionStatus();
 
   /**
@@ -639,34 +635,34 @@ function ManageGroupsModal3({ onBack }) {
    */
   const handleConfirmDelete = async () => {
     if (!groupToDelete) return;
-    
+
     try {
       setDeleteLoading(true);
       setDeleteError('');
-      
+
       // 1. Fetch all items in the group
       const response = await client.graphql({
         query: equipmentItemsByGroupID,
         variables: { groupID: groupToDelete.id }
       });
-      
+
       const groupItems = response.data.equipmentItemsByGroupID.items;
       console.log(`Found ${groupItems.length} items in the group to release`);
-      
+
       // 2. Release all items from the group
       let releasedCount = 0;
       let failedCount = 0;
-      
+
       for (const item of groupItems) {
         try {
           // Custom update query that ignores version conflicts
           await client.graphql({
             query: `mutation ReleaseItemFromGroup($id: ID!) {
               updateEquipmentItem(
-                input: { 
-                  id: $id, 
-                  isPartOfGroup: false, 
-                  groupID: null 
+                input: {
+                  id: $id,
+                  isPartOfGroup: false,
+                  groupID: null
                 },
                 condition: null
               ) {
@@ -675,14 +671,14 @@ function ManageGroupsModal3({ onBack }) {
             }`,
             variables: { id: item.id }
           });
-          
+
           releasedCount++;
         } catch (error) {
           console.error(`Error releasing item ${item.id} from group:`, error);
           failedCount++;
         }
       }
-      
+
       // 3. Fetch the latest version of the group to handle conflicts
       try {
         const getGroupResponse = await client.graphql({
@@ -694,12 +690,12 @@ function ManageGroupsModal3({ onBack }) {
           }`,
           variables: { id: groupToDelete.id }
         });
-        
+
         const latestGroup = getGroupResponse.data.getEquipmentGroup;
         if (!latestGroup) {
           throw new Error("Couldn't fetch the latest version of the group");
         }
-        
+
         // 4. Delete the group itself using the latest version
         await client.graphql({
           query: deleteEquipmentGroup,
@@ -710,28 +706,28 @@ function ManageGroupsModal3({ onBack }) {
             }
           }
         });
-        
+
         // 5. Sync changes to local DataStore
         await syncChangesToDataStore();
-        
+
         // 6. Show success message and refresh the view
         setSuccess(`Successfully deleted group "${groupToDelete.name}". Released ${releasedCount} items from the group.${
           failedCount > 0 ? ` Failed to release ${failedCount} items.` : ''
         }`);
-        
+
         setShowDeleteModal(false);
         setGroupToDelete(null);
-        
+
         // If we were viewing the deleted group, go back to the groups list
         if (selectedGroup && selectedGroup.id === groupToDelete.id) {
           setSelectedGroup(null);
         }
-        
+
         // Refresh the groups list
         fetchExistingGroups(uicID);
       } catch (groupError) {
         console.error('Error fetching or deleting group:', groupError);
-        
+
         // Fallback approach - try a direct deletion with condition: null to override version checking
         try {
           await client.graphql({
@@ -745,21 +741,21 @@ function ManageGroupsModal3({ onBack }) {
             }`,
             variables: { id: groupToDelete.id }
           });
-          
+
           // Success with fallback approach
           await syncChangesToDataStore();
-          
+
           setSuccess(`Successfully deleted group "${groupToDelete.name}" with force delete. Released ${releasedCount} items from the group.${
             failedCount > 0 ? ` Failed to release ${failedCount} items.` : ''
           }`);
-          
+
           setShowDeleteModal(false);
           setGroupToDelete(null);
-          
+
           if (selectedGroup && selectedGroup.id === groupToDelete.id) {
             setSelectedGroup(null);
           }
-          
+
           fetchExistingGroups(uicID);
         } catch (fallbackError) {
           console.error('Fallback delete also failed:', fallbackError);
@@ -782,16 +778,16 @@ function ManageGroupsModal3({ onBack }) {
           &larr; Back
         </button>
       </div>
-      
+
       {/* Tabs */}
       <div className="groups-tabs">
-        <button 
+        <button
           className={`tab-button ${activeTab === 'create' ? 'active' : ''}`}
           onClick={() => setActiveTab('create')}
         >
           Create Group
         </button>
-        <button 
+        <button
           className={`tab-button ${activeTab === 'view' ? 'active' : ''}`}
           onClick={() => {
             setActiveTab('view');
@@ -801,15 +797,15 @@ function ManageGroupsModal3({ onBack }) {
           View Groups
         </button>
       </div>
-      
+
       {error && <div className="error-message">{error}</div>}
       {success && <div className="success-message">{success}</div>}
-      
+
       {/* Loading state with retry button */}
       {loading && (
         <div className="loading-overlay">
           <div>Loading...</div>
-          <button 
+          <button
             className="retry-button"
             onClick={() => {
               setLoading(false);
@@ -820,7 +816,7 @@ function ManageGroupsModal3({ onBack }) {
           </button>
         </div>
       )}
-      
+
       {/* Create Group Tab */}
       {activeTab === 'create' && (
         <div className="create-group-v3">
@@ -830,19 +826,19 @@ function ManageGroupsModal3({ onBack }) {
               Group Setup: {status.completed} of {status.total} steps completed
             </div>
             <div className="progress-bar">
-              <div 
-                className="progress-fill" 
+              <div
+                className="progress-fill"
                 style={{ width: `${status.percent}%` }}
               ></div>
             </div>
           </div>
-          
+
           {/* Base Item Selection */}
           <div className="base-item-section">
             <h3>
               {baseItem ? 'Base Item Selected' : 'Select Base Item'}
               {baseItem && (
-                <button 
+                <button
                   className="clear-button"
                   onClick={() => setBaseItem(null)}
                 >
@@ -850,20 +846,20 @@ function ManageGroupsModal3({ onBack }) {
                 </button>
               )}
             </h3>
-            
+
             {baseItem && (
               <div className="selected-base-v3">
                 <div className="base-item-tile">
                   {baseItem.imageUrl ? (
-                    <img 
-                      src={baseItem.imageUrl} 
-                      alt={baseItem.commonName} 
-                      className="item-thumbnail" 
+                    <img
+                      src={baseItem.imageUrl}
+                      alt={baseItem.commonName}
+                      className="item-thumbnail"
                     />
                   ) : (
                     <div className="item-icon" data-type={baseItem.type || 'other'}>
-                      {baseItem.type === 'weapons' ? '🔫' : 
-                       baseItem.type === 'optics' ? '🔍' : 
+                      {baseItem.type === 'weapons' ? '🔫' :
+                       baseItem.type === 'optics' ? '🔍' :
                        baseItem.type === 'comms' ? '📻' : '📦'}
                     </div>
                   )}
@@ -879,15 +875,15 @@ function ManageGroupsModal3({ onBack }) {
               </div>
             )}
           </div>
-          
+
           {/* Components Section */}
           <div className="components-section">
             <h3>
-              {selectedComponents.length > 0 
-                ? `Components Selected (${selectedComponents.length})` 
+              {selectedComponents.length > 0
+                ? `Components Selected (${selectedComponents.length})`
                 : 'Select Components'}
               {selectedComponents.length > 0 && (
-                <button 
+                <button
                   className="clear-button"
                   onClick={() => setSelectedComponents([])}
                 >
@@ -895,24 +891,24 @@ function ManageGroupsModal3({ onBack }) {
                 </button>
               )}
             </h3>
-            
+
             {selectedComponents.length > 0 && (
               <div className="selected-components-grid">
                 {selectedComponents.map(component => (
-                  <div 
-                    key={component.id} 
+                  <div
+                    key={component.id}
                     className="component-tile"
                   >
                     {component.imageUrl ? (
-                      <img 
-                        src={component.imageUrl} 
-                        alt={component.commonName} 
-                        className="item-thumbnail" 
+                      <img
+                        src={component.imageUrl}
+                        alt={component.commonName}
+                        className="item-thumbnail"
                       />
                     ) : (
                       <div className="item-icon" data-type={component.type || 'other'}>
-                        {component.type === 'weapons' ? '🔫' : 
-                         component.type === 'optics' ? '🔍' : 
+                        {component.type === 'weapons' ? '🔫' :
+                         component.type === 'optics' ? '🔍' :
                          component.type === 'comms' ? '📻' : '📦'}
                       </div>
                     )}
@@ -924,7 +920,7 @@ function ManageGroupsModal3({ onBack }) {
                         {component.stockNumber && <span className="text-ellipsis" title={`Stock #: ${component.stockNumber}`}>Stock #: {component.stockNumber}</span>}
                       </div>
                     </div>
-                    <button 
+                    <button
                       className="remove-btn"
                       onClick={(e) => {
                         e.stopPropagation();
@@ -935,7 +931,7 @@ function ManageGroupsModal3({ onBack }) {
                     </button>
                   </div>
                 ))}
-                
+
                 <div className="add-component-tile">
                   <div className="add-icon">+</div>
                   <div>Add Component</div>
@@ -943,44 +939,44 @@ function ManageGroupsModal3({ onBack }) {
               </div>
             )}
           </div>
-          
+
           {/* Search and Filter */}
           <div className="search-filter-v3">
             <div className="search-box">
-              <input 
+              <input
                 type="text"
                 placeholder="Search items..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            
+
             <div className="filter-tabs">
-              <button 
+              <button
                 className={`filter-tab ${itemType === 'all' ? 'active' : ''}`}
                 onClick={() => setItemType('all')}
               >
                 All
               </button>
-              <button 
+              <button
                 className={`filter-tab ${itemType === 'weapons' ? 'active' : ''}`}
                 onClick={() => setItemType('weapons')}
               >
                 Weapons
               </button>
-              <button 
+              <button
                 className={`filter-tab ${itemType === 'optics' ? 'active' : ''}`}
                 onClick={() => setItemType('optics')}
               >
                 Optics
               </button>
-              <button 
+              <button
                 className={`filter-tab ${itemType === 'comms' ? 'active' : ''}`}
                 onClick={() => setItemType('comms')}
               >
                 Comms
               </button>
-              <button 
+              <button
                 className={`filter-tab ${itemType === 'attachments' ? 'active' : ''}`}
                 onClick={() => setItemType('attachments')}
               >
@@ -988,7 +984,7 @@ function ManageGroupsModal3({ onBack }) {
               </button>
             </div>
           </div>
-          
+
           {/* Items Grid */}
           <div className="items-grid-v3">
             {filteredItems.length === 0 ? (
@@ -997,9 +993,9 @@ function ManageGroupsModal3({ onBack }) {
               filteredItems.map(item => {
                 const isBase = baseItem && baseItem.id === item.id;
                 const isComponent = selectedComponents.some(c => c.id === item.id);
-                
+
                 return (
-                  <div 
+                  <div
                     key={item.id}
                     className={`item-tile ${isBase ? 'is-base' : ''} ${isComponent ? 'is-component' : ''}`}
                     onClick={() => {
@@ -1015,15 +1011,15 @@ function ManageGroupsModal3({ onBack }) {
                     }}
                   >
                     {item.imageUrl ? (
-                      <img 
-                        src={item.imageUrl} 
-                        alt={item.commonName} 
-                        className="item-thumbnail" 
+                      <img
+                        src={item.imageUrl}
+                        alt={item.commonName}
+                        className="item-thumbnail"
                       />
                     ) : (
                       <div className="item-icon" data-type={item.type || 'other'}>
-                        {item.type === 'weapons' ? '🔫' : 
-                         item.type === 'optics' ? '🔍' : 
+                        {item.type === 'weapons' ? '🔫' :
+                         item.type === 'optics' ? '🔍' :
                          item.type === 'comms' ? '📻' : '📦'}
                       </div>
                     )}
@@ -1042,40 +1038,40 @@ function ManageGroupsModal3({ onBack }) {
               })
             )}
           </div>
-          
+
           {/* Group Form - Moved to bottom */}
           <div className="group-details-form">
             <div className="form-group">
               <label>Group Name:</label>
-              <input 
-                type="text" 
-                value={groupName} 
-                onChange={(e) => setGroupName(e.target.value)} 
+              <input
+                type="text"
+                value={groupName}
+                onChange={(e) => setGroupName(e.target.value)}
                 placeholder="e.g., M4 Rifle Set"
                 className={groupName ? 'valid' : ''}
               />
             </div>
-            
+
             <div className="form-group">
               <label>Description (Optional):</label>
-              <textarea 
-                value={groupDescription} 
-                onChange={(e) => setGroupDescription(e.target.value)} 
+              <textarea
+                value={groupDescription}
+                onChange={(e) => setGroupDescription(e.target.value)}
                 placeholder="Enter details about this equipment group"
                 rows={2}
               />
             </div>
           </div>
-          
+
           {/* Action Buttons */}
           <div className="group-actions">
-            <button 
+            <button
               className="secondary-button"
               onClick={handleResetCreateForm}
             >
               Reset
             </button>
-            <button 
+            <button
               className="primary-button"
               onClick={handleCreateGroup}
               disabled={!baseItem || !groupName.trim()}
@@ -1085,12 +1081,12 @@ function ManageGroupsModal3({ onBack }) {
           </div>
         </div>
       )}
-      
+
       {/* View Groups Tab - Add delete button to each group */}
       {activeTab === 'view' && !selectedGroup && (
         <div className="view-groups-v3">
           <h3>Your Equipment Groups</h3>
-          
+
           {existingGroups.length === 0 ? (
             <div className="no-groups-message">
               You haven't created any equipment groups yet.
@@ -1098,7 +1094,7 @@ function ManageGroupsModal3({ onBack }) {
           ) : (
             <div className="groups-grid">
               {existingGroups.map(group => (
-                <div 
+                <div
                   key={group.id}
                   className="group-tile"
                 >
@@ -1110,7 +1106,7 @@ function ManageGroupsModal3({ onBack }) {
                     </div>
                   </div>
                   <div className="group-tile-actions">
-                    <button 
+                    <button
                       className="delete-group-btn"
                       onClick={(e) => {
                         e.stopPropagation();
@@ -1126,32 +1122,32 @@ function ManageGroupsModal3({ onBack }) {
           )}
         </div>
       )}
-      
+
       {/* View Single Group - Add delete button */}
       {activeTab === 'view' && selectedGroup && (
         <div className="view-single-group">
           <div className="group-header">
-            <button 
+            <button
               className="back-to-groups"
               onClick={() => setSelectedGroup(null)}
             >
               &larr; Back to Groups
             </button>
             <h3>{selectedGroup.name}</h3>
-            <button 
+            <button
               className="delete-group-btn"
               onClick={() => handleDeleteGroupClick(selectedGroup)}
             >
               Delete Group
             </button>
           </div>
-          
+
           {selectedGroup.description && (
             <div className="group-description">
               {selectedGroup.description}
             </div>
           )}
-          
+
           <h4>Group Items</h4>
           {groupItems.length === 0 ? (
             <div className="loading">Loading group items...</div>
@@ -1160,10 +1156,10 @@ function ManageGroupsModal3({ onBack }) {
               {groupItems.map(item => (
                 <div key={item.id} className="group-item-tile">
                   {item.imageUrl ? (
-                    <img 
-                      src={item.imageUrl} 
-                      alt={item.commonName} 
-                      className="item-thumbnail" 
+                    <img
+                      src={item.imageUrl}
+                      alt={item.commonName}
+                      className="item-thumbnail"
                     />
                   ) : (
                     <div className="item-icon">📦</div>
@@ -1181,7 +1177,7 @@ function ManageGroupsModal3({ onBack }) {
           )}
         </div>
       )}
-      
+
       {/* Add Delete Group Confirmation Modal */}
       {showDeleteModal && groupToDelete && (
         <div className="modal-overlay">
@@ -1190,23 +1186,23 @@ function ManageGroupsModal3({ onBack }) {
             <p className="warning-text">
               Are you sure you want to delete the group "{groupToDelete.name}"?
             </p>
-            
+
             <div className="warning-box">
               <p>This will remove the grouping relationship but will NOT delete the individual equipment items.</p>
               <p>All items in this group will be released and will become available as individual items.</p>
             </div>
-            
+
             {deleteError && <div className="error-message">{deleteError}</div>}
-            
+
             <div className="modal-actions">
-              <button 
+              <button
                 className="secondary-button"
                 onClick={handleCancelDelete}
                 disabled={deleteLoading}
               >
                 Cancel
               </button>
-              <button 
+              <button
                 className="delete-btn"
                 onClick={handleConfirmDelete}
                 disabled={deleteLoading}
@@ -1217,7 +1213,7 @@ function ManageGroupsModal3({ onBack }) {
           </div>
         </div>
       )}
-      
+
       {/* Add some CSS for text ellipsis right after the return statement */}
       <style jsx>{`
         .text-ellipsis {
@@ -1227,7 +1223,7 @@ function ManageGroupsModal3({ onBack }) {
           max-width: 100%;
           display: inline-block;
         }
-        
+
         .retry-button {
           margin-top: 15px;
           padding: 8px 16px;
@@ -1237,11 +1233,11 @@ function ManageGroupsModal3({ onBack }) {
           border-radius: 4px;
           cursor: pointer;
         }
-        
+
         .retry-button:hover {
           background-color: #4a4a4a;
         }
-        
+
         .loading-overlay {
           position: fixed;
           top: 0;
@@ -1262,4 +1258,4 @@ function ManageGroupsModal3({ onBack }) {
   );
 }
 
-export default ManageGroupsModal3; 
+export default ManageGroupsModal3;

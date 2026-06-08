@@ -53,12 +53,13 @@ const MaintenanceStatus = {
   "MISSING": "MISSING"
 };
 
-const { UIC, User, UICMembershipRequest, Soldier, EquipmentMaster, EquipmentItem, EquipmentGroup, HandReceiptStatus, AccountabilitySession, AccountabilityItem } = initSchema(schema);
+const { UIC, User, UICMembershipRequest, UICCreationRequest, Soldier, EquipmentMaster, EquipmentItem, EquipmentGroup, HandReceiptStatus, AccountabilitySession, AccountabilityItem, AdditionalUIC } = initSchema(schema);
 
 export {
   UIC,
   User,
   UICMembershipRequest,
+  UICCreationRequest,
   Soldier,
   EquipmentMaster,
   EquipmentItem,
@@ -66,6 +67,7 @@ export {
   HandReceiptStatus,
   AccountabilitySession,
   AccountabilityItem,
+  AdditionalUIC,
   Role,
   RequestStatus,
   HandReceiptStatusType,

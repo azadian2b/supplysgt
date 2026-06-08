@@ -2,6 +2,11 @@
   /* Light mode (default) */
   --background-color: #ffffff;
   --text-color: #333333;
+  --heading-color: #17202b;
+  --muted-text-color: #5f6b7a;
+  --border-color: #d8dde6;
+  --surface-color: #ffffff;
+  --surface-muted-color: #f5f7fa;
   --primary-button-bg: #282c34;
   --primary-button-text: white;
   --secondary-button-bg: #6c778d;
@@ -26,6 +31,11 @@
 [data-theme='dark'] {
   --background-color: #000000;
   --text-color: #ff0000; /* Red text for night vision */
+  --heading-color: #ff4d4d;
+  --muted-text-color: #ff8a8a;
+  --border-color: #471414;
+  --surface-color: #0f0f0f;
+  --surface-muted-color: #171111;
   --primary-button-bg: #ff0000; /* Red buttons */
   --primary-button-text: #000000; /* Black text on buttons */
   --secondary-button-bg: #ff0000;
@@ -118,4 +128,4 @@ input, select {
 
 .sync-notice {
   color: var(--info-text);
-} 
+}

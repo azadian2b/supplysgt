@@ -28,12 +28,6 @@
           "DOMAINALLOWLIST": "army.mil, gmail.com",
           "deploymentBucketName": "amplify-supplysgtapp-dev-a792b-deployment",
           "s3Key": "amplify-builds/supplysgtapp2f24982cPreSignup-4a5a4f56376677316e30-build.zip"
-        },
-        "approvalNotifier": {
-          "deploymentBucketName": "amplify-supplysgtapp-dev-a792b-deployment",
-          "s3Key": "amplify-builds/approvalNotifier-4f6776643051706f2b78-build.zip",
-          "userPoolId": "us-east-1_GzkyUvzWd",
-          "fromEmail": "nathaniel.mckinnon@gmail.com"
         }
       },
       "hosting": {

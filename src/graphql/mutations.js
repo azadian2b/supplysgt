@@ -45,6 +45,11 @@ export const createUIC = /* GraphQL */ `
         startedAt
         __typename
       }
+      additionalUICs {
+        nextToken
+        startedAt
+        __typename
+      }
       createdAt
       updatedAt
       _version
@@ -99,6 +104,11 @@ export const updateUIC = /* GraphQL */ `
         startedAt
         __typename
       }
+      additionalUICs {
+        nextToken
+        startedAt
+        __typename
+      }
       createdAt
       updatedAt
       _version
@@ -149,6 +159,11 @@ export const deleteUIC = /* GraphQL */ `
         __typename
       }
       accountabilitySessions {
+        nextToken
+        startedAt
+        __typename
+      }
+      additionalUICs {
         nextToken
         startedAt
         __typename
@@ -209,6 +224,11 @@ export const createUser = /* GraphQL */ `
         startedAt
         __typename
       }
+      additionalUICs {
+        nextToken
+        startedAt
+        __typename
+      }
       createdAt
       updatedAt
       _version
@@ -264,6 +284,11 @@ export const updateUser = /* GraphQL */ `
         startedAt
         __typename
       }
+      additionalUICs {
+        nextToken
+        startedAt
+        __typename
+      }
       createdAt
       updatedAt
       _version
@@ -315,6 +340,11 @@ export const deleteUser = /* GraphQL */ `
         __typename
       }
       verifiedItems {
+        nextToken
+        startedAt
+        __typename
+      }
+      additionalUICs {
         nextToken
         startedAt
         __typename
@@ -1861,6 +1891,147 @@ export const deleteAccountabilityItem = /* GraphQL */ `
       confirmationStatus
       confirmedAt
       notes
+      createdAt
+      updatedAt
+      _version
+      _deleted
+      _lastChangedAt
+      __typename
+    }
+  }
+`;
+export const createAdditionalUIC = /* GraphQL */ `
+  mutation CreateAdditionalUIC(
+    $input: CreateAdditionalUICInput!
+    $condition: ModelAdditionalUICConditionInput
+  ) {
+    createAdditionalUIC(input: $input, condition: $condition) {
+      id
+      userID
+      uicID
+      user {
+        id
+        owner
+        firstName
+        lastName
+        rank
+        role
+        uicID
+        linkedSoldierId
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        __typename
+      }
+      uic {
+        id
+        uicCode
+        name
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        owner
+        __typename
+      }
+      status
+      createdAt
+      updatedAt
+      _version
+      _deleted
+      _lastChangedAt
+      __typename
+    }
+  }
+`;
+export const updateAdditionalUIC = /* GraphQL */ `
+  mutation UpdateAdditionalUIC(
+    $input: UpdateAdditionalUICInput!
+    $condition: ModelAdditionalUICConditionInput
+  ) {
+    updateAdditionalUIC(input: $input, condition: $condition) {
+      id
+      userID
+      uicID
+      user {
+        id
+        owner
+        firstName
+        lastName
+        rank
+        role
+        uicID
+        linkedSoldierId
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        __typename
+      }
+      uic {
+        id
+        uicCode
+        name
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        owner
+        __typename
+      }
+      status
+      createdAt
+      updatedAt
+      _version
+      _deleted
+      _lastChangedAt
+      __typename
+    }
+  }
+`;
+export const deleteAdditionalUIC = /* GraphQL */ `
+  mutation DeleteAdditionalUIC(
+    $input: DeleteAdditionalUICInput!
+    $condition: ModelAdditionalUICConditionInput
+  ) {
+    deleteAdditionalUIC(input: $input, condition: $condition) {
+      id
+      userID
+      uicID
+      user {
+        id
+        owner
+        firstName
+        lastName
+        rank
+        role
+        uicID
+        linkedSoldierId
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        __typename
+      }
+      uic {
+        id
+        uicCode
+        name
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        owner
+        __typename
+      }
+      status
       createdAt
       updatedAt
       _version

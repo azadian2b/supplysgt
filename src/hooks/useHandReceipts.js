@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { generateClient } from 'aws-amplify/api';
-import { uploadData, getUrl } from 'aws-amplify/storage';
+import { getUrl } from 'aws-amplify/storage';
 
 const client = generateClient(); // Define client outside of the hook if it's stable
 
@@ -13,14 +13,14 @@ const useHandReceipts = (uicID) => {
   const [success, setSuccess] = useState('');
   const [activeHandReceipts, setActiveHandReceipts] = useState([]);
   const [processingAction, setProcessingAction] = useState(false);
-  
+
   // Track if initial data has been loaded
   const initialLoadComplete = useRef(false);
 
   // Load active hand receipts - no dependencies to prevent polling
   const loadActiveHandReceipts = useCallback(async (currentUicID) => {
     if (!currentUicID) return;
-    
+
     setLoading(true);
     try {
       // Query for hand receipt statuses that are ISSUED (not RETURNED)
@@ -60,16 +60,16 @@ const useHandReceipts = (uicID) => {
             }
           }
         }`,
-        variables: { 
+        variables: {
           fromUIC: currentUicID,
           status: 'ISSUED'
         }
       });
-      
+
       // Group hand receipt statuses by receipt number
       const statuses = response.data.handReceiptStatusesByFromUIC.items;
       const receiptMap = {};
-      
+
       statuses.forEach(status => {
         if (!receiptMap[status.receiptNumber]) {
           receiptMap[status.receiptNumber] = {
@@ -80,7 +80,7 @@ const useHandReceipts = (uicID) => {
             pdfS3Key: status.pdfS3Key
           };
         }
-        
+
         if (status.equipmentItem) {
           receiptMap[status.receiptNumber].items.push({
             id: status.equipmentItem.id,
@@ -93,10 +93,10 @@ const useHandReceipts = (uicID) => {
           });
         }
       });
-      
+
       const receipts = Object.values(receiptMap);
       setActiveHandReceipts(receipts);
-      
+
       return receipts;
     } catch (err) {
       console.error("Error loading active hand receipts:", err);
@@ -113,7 +113,7 @@ const useHandReceipts = (uicID) => {
       const result = await getUrl({
         key: pdfS3Key
       });
-      
+
       return result.url.toString();
     } catch (err) {
       console.error("Error getting hand receipt PDF:", err);
@@ -128,10 +128,10 @@ const useHandReceipts = (uicID) => {
       setError("No items to return");
       return;
     }
-    
+
     setProcessingAction(true);
     setError('');
-    
+
     try {
       // Update HandReceiptStatus records for each item
       for (const item of receipt.items) {
@@ -148,14 +148,14 @@ const useHandReceipts = (uicID) => {
               id: item.handReceiptStatusID
             }
           });
-          
+
           const statusRecord = statusResponse.data.getHandReceiptStatus;
-          
+
           if (!statusRecord || statusRecord.status !== 'ISSUED') {
             console.warn(`Item ${item.id} is not currently issued or status record not found`);
             continue;
           }
-          
+
           // Update the status record
           await client.graphql({
             query: `mutation UpdateHandReceiptStatus($input: UpdateHandReceiptStatusInput!) {
@@ -179,12 +179,12 @@ const useHandReceipts = (uicID) => {
           console.error(`Error updating HandReceiptStatus for item ${item.id}:`, err);
         }
       }
-      
+
       // This is an explicit action, so refresh active hand receipts
       if (uicID) {
         await loadActiveHandReceipts(uicID);
       }
-      
+
       setSuccess(`${receipt.items.length} items have been returned from hand receipt ${receipt.receiptNumber}.`);
       return true;
     } catch (err) {
@@ -202,10 +202,10 @@ const useHandReceipts = (uicID) => {
       setError("Invalid item to return");
       return;
     }
-    
+
     setProcessingAction(true);
     setError('');
-    
+
     try {
       // Get the status record
       const statusResponse = await client.graphql({
@@ -220,14 +220,14 @@ const useHandReceipts = (uicID) => {
           id: item.handReceiptStatusID
         }
       });
-      
+
       const statusRecord = statusResponse.data.getHandReceiptStatus;
-      
+
       if (!statusRecord || statusRecord.status !== 'ISSUED') {
         setError(`Item is not currently issued or status record not found`);
         return false;
       }
-      
+
       // Update the status record
       await client.graphql({
         query: `mutation UpdateHandReceiptStatus($input: UpdateHandReceiptStatusInput!) {
@@ -247,12 +247,12 @@ const useHandReceipts = (uicID) => {
           }
         }
       });
-      
+
       // This is an explicit action, so refresh active hand receipts
       if (uicID) {
         await loadActiveHandReceipts(uicID);
       }
-      
+
       setSuccess(`Item ${item.name || item.nsn} has been returned from hand receipt ${receiptNumber}.`);
       return true;
     } catch (err) {
@@ -287,4 +287,4 @@ const useHandReceipts = (uicID) => {
   };
 };
 
-export default useHandReceipts; 
+export default useHandReceipts;

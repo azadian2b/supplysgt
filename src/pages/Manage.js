@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { FaBoxes, FaLayerGroup, FaListAlt, FaPlus } from 'react-icons/fa';
 import './Pages.css';
 import '../App.css';
 import '../components/equipment/ModalStyles.css';
@@ -6,13 +7,14 @@ import AddEquipmentModal from '../components/equipment/AddEquipmentModal';
 import InventoryList from '../components/equipment/InventoryList';
 import ManageGroupsModal from '../components/equipment/ManageGroupsModal3';
 import EquipmentMasterModal from '../components/equipment/EquipmentMasterModal';
+import { PageHeader } from '../components/ui/PageHeader';
 
 function Manage() {
   const [showAddEquipment, setShowAddEquipment] = useState(false);
   const [showInventory, setShowInventory] = useState(false);
   const [showGroups, setShowGroups] = useState(false);
   const [showEquipmentMaster, setShowEquipmentMaster] = useState(false);
-  
+
   // Check session storage for stored navigation state on component mount
   useEffect(() => {
     // Check if we should automatically open the inventory view
@@ -25,39 +27,58 @@ function Manage() {
     }
   }, []);
 
+  const actions = [
+    {
+      title: 'Add New Equipment',
+      description: 'Create inventory records for items assigned to this UIC.',
+      icon: <FaPlus />,
+      onClick: () => setShowAddEquipment(true)
+    },
+    {
+      title: 'Manage Item Catalog',
+      description: 'Maintain NSNs, nomenclature, tracking flags, and catalog metadata.',
+      icon: <FaListAlt />,
+      onClick: () => setShowEquipmentMaster(true)
+    },
+    {
+      title: 'View Inventory',
+      description: 'Review, edit, assign, and repair current unit inventory records.',
+      icon: <FaBoxes />,
+      onClick: () => setShowInventory(true)
+    },
+    {
+      title: 'Manage Equipment Groups',
+      description: 'Group related components and assign equipment packages together.',
+      icon: <FaLayerGroup />,
+      onClick: () => setShowGroups(true)
+    }
+  ];
+
   return (
-    <div className="page-container">
-      <h1>Manage Equipment</h1>
-      
-      <div className="button-container" style={{ maxWidth: '400px', margin: '2rem auto' }}>
-        <button 
-          className="nav-button"
-          onClick={() => setShowAddEquipment(true)}
-        >
-          Add New Equipment
-        </button>
-        <button 
-          className="nav-button"
-          onClick={() => setShowEquipmentMaster(true)}
-        >
-          Manage Item Catalog
-        </button>
-        <button 
-          className="nav-button"
-          onClick={() => setShowInventory(true)}
-        >
-          View Inventory
-        </button>
-        <button 
-          className="nav-button"
-          onClick={() => setShowGroups(true)}
-        >
-          Manage Equipment Groups
-        </button>
+    <div className="page-container page-container-wide">
+      <PageHeader
+        title="Manage Equipment"
+        subtitle="Add equipment, keep catalog records clean, review inventory, and organize deployable groups."
+      />
+
+      <div className="action-grid">
+        {actions.map(action => (
+          <button
+            key={action.title}
+            className="action-card"
+            onClick={action.onClick}
+          >
+            <span className="action-card-icon">{action.icon}</span>
+            <span className="action-card-copy">
+              <strong>{action.title}</strong>
+              <span>{action.description}</span>
+            </span>
+          </button>
+        ))}
       </div>
 
       {!showAddEquipment && !showInventory && !showGroups && !showEquipmentMaster && (
-        <p>Use the buttons above to add new equipment, update item details, view your unit's inventory, or manage equipment groups.</p>
+        <p className="page-intro">Choose a workflow above to continue.</p>
       )}
 
       {showAddEquipment && (
@@ -99,4 +120,4 @@ function Manage() {
   );
 }
 
-export default Manage; 
+export default Manage;

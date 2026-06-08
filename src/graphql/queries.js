@@ -42,6 +42,11 @@ export const getUIC = /* GraphQL */ `
         startedAt
         __typename
       }
+      additionalUICs {
+        nextToken
+        startedAt
+        __typename
+      }
       createdAt
       updatedAt
       _version
@@ -147,6 +152,11 @@ export const getUser = /* GraphQL */ `
         __typename
       }
       verifiedItems {
+        nextToken
+        startedAt
+        __typename
+      }
+      additionalUICs {
         nextToken
         startedAt
         __typename
@@ -1264,6 +1274,106 @@ export const syncAccountabilityItems = /* GraphQL */ `
     }
   }
 `;
+export const getAdditionalUIC = /* GraphQL */ `
+  query GetAdditionalUIC($id: ID!) {
+    getAdditionalUIC(id: $id) {
+      id
+      userID
+      uicID
+      user {
+        id
+        owner
+        firstName
+        lastName
+        rank
+        role
+        uicID
+        linkedSoldierId
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        __typename
+      }
+      uic {
+        id
+        uicCode
+        name
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        owner
+        __typename
+      }
+      status
+      createdAt
+      updatedAt
+      _version
+      _deleted
+      _lastChangedAt
+      __typename
+    }
+  }
+`;
+export const listAdditionalUICS = /* GraphQL */ `
+  query ListAdditionalUICS(
+    $filter: ModelAdditionalUICFilterInput
+    $limit: Int
+    $nextToken: String
+  ) {
+    listAdditionalUICS(filter: $filter, limit: $limit, nextToken: $nextToken) {
+      items {
+        id
+        userID
+        uicID
+        status
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        __typename
+      }
+      nextToken
+      startedAt
+      __typename
+    }
+  }
+`;
+export const syncAdditionalUICS = /* GraphQL */ `
+  query SyncAdditionalUICS(
+    $filter: ModelAdditionalUICFilterInput
+    $limit: Int
+    $nextToken: String
+    $lastSync: AWSTimestamp
+  ) {
+    syncAdditionalUICS(
+      filter: $filter
+      limit: $limit
+      nextToken: $nextToken
+      lastSync: $lastSync
+    ) {
+      items {
+        id
+        userID
+        uicID
+        status
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        __typename
+      }
+      nextToken
+      startedAt
+      __typename
+    }
+  }
+`;
 export const uICSByUicCode = /* GraphQL */ `
   query UICSByUicCode(
     $uicCode: String!
@@ -2037,21 +2147,6 @@ export const accountabilityItemsBySessionID = /* GraphQL */ `
         id
         sessionID
         equipmentItemID
-        equipmentItem {
-          id
-          nsn
-          lin
-          serialNumber
-          stockNumber
-          assignedToID
-          equipmentMasterID
-          equipmentMaster {
-            id
-            commonName
-            __typename
-          }
-          __typename
-        }
         status
         verificationMethod
         verifiedByID
@@ -2150,61 +2245,26 @@ export const accountabilityItemsByVerifiedByID = /* GraphQL */ `
     }
   }
 `;
-export const getHandReceiptedEquipment = /* GraphQL */ `
-  query GetHandReceiptedEquipment($uicID: ID!) {
-    handReceiptStatusesByFromUIC(
-      fromUIC: $uicID
-      filter: { status: { eq: ISSUED } }
+export const additionalUICSByUserID = /* GraphQL */ `
+  query AdditionalUICSByUserID(
+    $userID: ID!
+    $sortDirection: ModelSortDirection
+    $filter: ModelAdditionalUICFilterInput
+    $limit: Int
+    $nextToken: String
+  ) {
+    additionalUICSByUserID(
+      userID: $userID
+      sortDirection: $sortDirection
+      filter: $filter
+      limit: $limit
+      nextToken: $nextToken
     ) {
       items {
         id
-        receiptNumber
+        userID
+        uicID
         status
-        fromUIC
-        toSoldierID
-        equipmentItemID
-        issuedOn
-        returnedOn
-        soldier {
-          id
-          firstName
-          lastName
-          rank
-          role
-        }
-        equipmentItem {
-          id
-          uicID
-          equipmentMasterID
-          nsn
-          lin
-          serialNumber
-          stockNumber
-          location
-          assignedToID
-          maintenanceStatus
-          isPartOfGroup
-          groupID
-          assignedTo {
-            id
-            firstName
-            lastName
-            rank
-            role
-          }
-          equipmentGroup {
-            id
-            name
-            description
-            assignedToID
-          }
-          equipmentMaster {
-            id
-            nsn
-            commonName
-            description
-          }
-        }
         createdAt
         updatedAt
         _version
@@ -2214,6 +2274,40 @@ export const getHandReceiptedEquipment = /* GraphQL */ `
       }
       nextToken
       startedAt
+      __typename
+    }
+  }
+`;
+export const additionalUICSByUicID = /* GraphQL */ `
+  query AdditionalUICSByUicID(
+    $uicID: ID!
+    $sortDirection: ModelSortDirection
+    $filter: ModelAdditionalUICFilterInput
+    $limit: Int
+    $nextToken: String
+  ) {
+    additionalUICSByUicID(
+      uicID: $uicID
+      sortDirection: $sortDirection
+      filter: $filter
+      limit: $limit
+      nextToken: $nextToken
+    ) {
+      items {
+        id
+        userID
+        uicID
+        status
+        createdAt
+        updatedAt
+        _version
+        _deleted
+        _lastChangedAt
+        __typename
+      }
+      nextToken
+      startedAt
+      __typename
     }
   }
 `;

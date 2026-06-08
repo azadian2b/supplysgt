@@ -74,28 +74,6 @@
     }
   },
   "function": {
-    "approvalNotifier": {
-      "build": true,
-      "dependsOn": [
-        {
-          "attributes": [
-            "GraphQLAPIIdOutput",
-            "GraphQLAPIEndpointOutput"
-          ],
-          "category": "api",
-          "resourceName": "supplysgtapp"
-        },
-        {
-          "attributes": [
-            "UserPoolId"
-          ],
-          "category": "auth",
-          "resourceName": "supplysgtapp2f24982c"
-        }
-      ],
-      "providerPlugin": "awscloudformation",
-      "service": "Lambda"
-    },
     "supplysgtapp2f24982cCustomMessage": {
       "build": true,
       "providerPlugin": "awscloudformation",
@@ -115,38 +93,6 @@
     }
   },
   "parameters": {
-    "AMPLIFY_function_approvalNotifier_deploymentBucketName": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "approvalNotifier"
-        }
-      ]
-    },
-    "AMPLIFY_function_approvalNotifier_fromEmail": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "approvalNotifier"
-        }
-      ]
-    },
-    "AMPLIFY_function_approvalNotifier_s3Key": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "approvalNotifier"
-        }
-      ]
-    },
-    "AMPLIFY_function_approvalNotifier_userPoolId": {
-      "usedBy": [
-        {
-          "category": "function",
-          "resourceName": "approvalNotifier"
-        }
-      ]
-    },
     "AMPLIFY_function_supplysgtapp2f24982cCustomMessage_EMAILMESSAGE": {
       "usedBy": [
         {

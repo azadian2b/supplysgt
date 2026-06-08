@@ -1,28 +1,30 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { generateClient } from 'aws-amplify/api';
 import { DataStore } from '@aws-amplify/datastore';
 import { getUrl } from 'aws-amplify/storage';
 import { updateEquipmentItem, updateEquipmentGroup } from '../../graphql/mutations';
 import './Assignment.css';
-import { EquipmentItem, EquipmentGroup } from '../../models';
+import { EquipmentItem } from '../../models';
+
+const client = generateClient();
 
 /**
  * AssignmentModal component - Handles assignment of equipment items and groups to soldiers
- * 
+ *
  * Can be launched from two different contexts:
  * 1. From soldier view - prefills soldier, allows selecting equipment
  * 2. From equipment view - prefills equipment, allows selecting soldier
  */
-function AssignmentModal({ 
-  onClose, 
-  uicID, 
-  preselectedSoldier = null, 
+function AssignmentModal({
+  onClose,
+  uicID,
+  preselectedSoldier = null,
   preselectedItem = null,
   preselectedGroup = null,
   onAssignmentComplete
 }) {
   // Determine initial filter state based on props
-  const initialShowAssigned = Boolean((preselectedItem && preselectedItem.assignedToID) || 
+  const initialShowAssigned = Boolean((preselectedItem && preselectedItem.assignedToID) ||
                               (preselectedGroup && preselectedGroup.assignedToID));
 
   // State variables
@@ -32,32 +34,29 @@ function AssignmentModal({
   const [soldiers, setSoldiers] = useState([]);
   const [equipment, setEquipment] = useState([]);
   const [groups, setGroups] = useState([]);
-  
+
   // Active selection state
   const [selectedSoldier, setSelectedSoldier] = useState(preselectedSoldier);
   const [selectedItems, setSelectedItems] = useState(preselectedItem ? [preselectedItem] : []);
   const [selectedGroup, setSelectedGroup] = useState(preselectedGroup);
-  
+
   // Filter state - simplified
   const [soldierSearchTerm, setSoldierSearchTerm] = useState('');
   const [equipmentSearchTerm, setEquipmentSearchTerm] = useState('');
   const [showAssignedItems, setShowAssignedItems] = useState(initialShowAssigned);
-  
+
   // UI state
   const [activeTab, setActiveTab] = useState(preselectedGroup ? 'groups' : 'items');
   const [processingAssignment, setProcessingAssignment] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const assignmentDirection = preselectedSoldier ? 'toEquipment' : 'toSoldier';
-  
+
   // Ref to track if initial data load has completed
   const initialLoadCompleteRef = useRef(false);
-  
+
   // Ref for detecting clicks outside the dropdown
   const dropdownRef = useRef(null);
-  
-  // Create client outside of any callbacks to ensure stable reference
-  const client = generateClient();
-  
+
   // Helper to create a stable filter object
   const createFilter = (showAssigned) => {
     if (!showAssigned) {
@@ -84,7 +83,7 @@ function AssignmentModal({
       setActiveTab('items');
     }
   }, [preselectedItem, preselectedGroup]);
-  
+
   // Set initial selected soldier only when the prop changes
   useEffect(() => {
     if (preselectedSoldier) {
@@ -96,7 +95,7 @@ function AssignmentModal({
   useEffect(() => {
     // Skip if already loaded
     if (initialLoadCompleteRef.current) return;
-    
+
     const loadAllData = async () => {
       console.log('Starting initial data load...');
       setLoading(true);
@@ -122,15 +121,15 @@ function AssignmentModal({
             "x-cache-buster": new Date().getTime().toString()
           }
         });
-        
+
         const soldiersList = soldiersResponse.data.soldiersByUicID.items;
         setSoldiers(soldiersList);
         console.log('Loaded soldiers:', soldiersList.length);
-        
+
         // STEP 2: Load equipment items based on filter
         const filter = createFilter(showAssignedItems);
         console.log('Loading equipment items with filter:', showAssignedItems ? 'showing assigned' : 'hiding assigned');
-        
+
         const equipmentResponse = await client.graphql({
           query: `query GetEquipmentItemsByUIC($uicID: ID!, $filter: ModelEquipmentItemFilterInput) {
             equipmentItemsByUicID(uicID: $uicID, filter: $filter) {
@@ -156,10 +155,10 @@ function AssignmentModal({
             "x-cache-buster": new Date().getTime().toString()
           }
         });
-        
+
         const equipmentItems = equipmentResponse.data.equipmentItemsByUicID.items;
         console.log(`Found ${equipmentItems.length} equipment items matching filter`);
-        
+
         // Process items with master data
         const itemsWithDetails = await Promise.all(
           equipmentItems.map(async (item) => {
@@ -175,10 +174,10 @@ function AssignmentModal({
                 }`,
                 variables: { id: item.equipmentMasterID }
               });
-              
+
               const masterData = masterResponse.data.getEquipmentMaster;
               let imageUrl = null;
-              
+
               if (masterData?.imageKey) {
                 try {
                   const imageUrlResult = await getUrl({
@@ -190,7 +189,7 @@ function AssignmentModal({
                   console.error('Error getting image URL:', err);
                 }
               }
-              
+
               return {
                 ...item,
                 commonName: masterData?.commonName || `Item ${item.nsn}`,
@@ -205,12 +204,12 @@ function AssignmentModal({
             }
           })
         );
-        
+
         setEquipment(itemsWithDetails);
-        
+
         // STEP 3: Load equipment groups
         console.log('Loading equipment groups with filter:', showAssignedItems ? 'showing assigned' : 'hiding assigned');
-        
+
         const groupsResponse = await client.graphql({
           query: `query GetEquipmentGroupsByUIC($uicID: ID!, $filter: ModelEquipmentGroupFilterInput) {
             equipmentGroupsByUicID(uicID: $uicID, filter: $filter) {
@@ -229,10 +228,10 @@ function AssignmentModal({
             "x-cache-buster": new Date().getTime().toString()
           }
         });
-        
+
         const groupsList = groupsResponse.data.equipmentGroupsByUicID.items;
         console.log(`Found ${groupsList.length} equipment groups matching filter`);
-        
+
         // Process groups with item counts
         const groupsWithCounts = await Promise.all(
           groupsList.map(async (group) => {
@@ -247,9 +246,9 @@ function AssignmentModal({
                 }`,
                 variables: { groupID: group.id }
               });
-              
+
               const groupItems = itemsResponse.data.equipmentItemsByGroupID.items;
-              
+
               return {
                 ...group,
                 itemCount: groupItems.length
@@ -263,10 +262,10 @@ function AssignmentModal({
             }
           })
         );
-        
+
         setGroups(groupsWithCounts);
         console.log('Initial data load complete');
-        
+
       } catch (error) {
         console.error('Error in initial data load:', error);
         setError('Failed to load data: ' + error.message);
@@ -276,10 +275,10 @@ function AssignmentModal({
         initialLoadCompleteRef.current = true;
       }
     };
-    
+
     loadAllData();
-  }, [uicID, initialShowAssigned]); // Stable dependencies that won't change during component lifecycle
-  
+  }, [uicID, showAssignedItems]);
+
   // Handle click outside dropdown to close it
   useEffect(() => {
     function handleClickOutside(event) {
@@ -287,7 +286,7 @@ function AssignmentModal({
         setDropdownOpen(false);
       }
     }
-    
+
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
@@ -297,14 +296,14 @@ function AssignmentModal({
   // Handle show assigned items toggle
   const handleShowAssignedToggle = async (checked) => {
     setShowAssignedItems(checked);
-    
+
     // Reload data when the checkbox is manually toggled
     setLoading(true);
-    
+
     try {
       console.log('Reloading data with filter changed to:', checked ? 'showing assigned' : 'hiding assigned');
       const filter = createFilter(checked);
-      
+
       // Load equipment with new filter
       const equipmentResponse = await client.graphql({
         query: `query GetEquipmentItemsByUIC($uicID: ID!, $filter: ModelEquipmentItemFilterInput) {
@@ -331,10 +330,10 @@ function AssignmentModal({
           "x-cache-buster": new Date().getTime().toString()
         }
       });
-      
+
       const equipmentItems = equipmentResponse.data.equipmentItemsByUicID.items;
       console.log(`Reload found ${equipmentItems.length} equipment items matching filter`);
-      
+
       // Process items with master data
       const itemsWithDetails = await Promise.all(equipmentItems.map(async (item) => {
         try {
@@ -349,10 +348,10 @@ function AssignmentModal({
             }`,
             variables: { id: item.equipmentMasterID }
           });
-          
+
           const masterData = masterResponse.data.getEquipmentMaster;
           let imageUrl = null;
-          
+
           if (masterData?.imageKey) {
             try {
               const imageUrlResult = await getUrl({
@@ -360,11 +359,11 @@ function AssignmentModal({
                 options: { expiresIn: 3600 }
               });
               imageUrl = imageUrlResult.url.toString();
-            } catch (err) { 
-              console.error('Error getting image URL:', err); 
+            } catch (err) {
+              console.error('Error getting image URL:', err);
             }
           }
-          
+
           return {
             ...item,
             commonName: masterData?.commonName || `Item ${item.nsn}`,
@@ -378,9 +377,9 @@ function AssignmentModal({
           };
         }
       }));
-      
+
       setEquipment(itemsWithDetails);
-      
+
       // Load groups with new filter
       const groupsResponse = await client.graphql({
         query: `query GetEquipmentGroupsByUIC($uicID: ID!, $filter: ModelEquipmentGroupFilterInput) {
@@ -400,10 +399,10 @@ function AssignmentModal({
           "x-cache-buster": new Date().getTime().toString()
         }
       });
-      
+
       const groupsList = groupsResponse.data.equipmentGroupsByUicID.items;
       console.log(`Reload found ${groupsList.length} equipment groups matching filter`);
-      
+
       // Process groups with item counts
       const groupsWithCounts = await Promise.all(groupsList.map(async (group) => {
         try {
@@ -417,9 +416,9 @@ function AssignmentModal({
             }`,
             variables: { groupID: group.id }
           });
-          
+
           const groupItems = itemsResponse.data.equipmentItemsByGroupID.items;
-          
+
           return {
             ...group,
             itemCount: groupItems.length
@@ -432,7 +431,7 @@ function AssignmentModal({
           };
         }
       }));
-      
+
       setGroups(groupsWithCounts);
       console.log('Filter reload complete');
     } catch (error) {
@@ -448,14 +447,14 @@ function AssignmentModal({
     setSelectedSoldier(soldier);
     setSoldierSearchTerm('');
     setDropdownOpen(false);
-    
+
     // If in "toEquipment" mode, reset equipment selections
     if (assignmentDirection === 'toEquipment') {
       setSelectedItems([]);
       setSelectedGroup(null);
     }
   };
-  
+
   // Handle item selection
   const handleSelectItem = (item) => {
     // If item is already part of a group, it can't be individually assigned
@@ -463,22 +462,22 @@ function AssignmentModal({
       setError('This item is part of a group and cannot be individually assigned. Please assign the entire group instead.');
       return;
     }
-    
+
     // If the item is already assigned to someone else, show an error
     if (item.assignedToID && item.assignedToID !== selectedSoldier?.id) {
       setError(`This item is already assigned to another soldier. Please unassign it first.`);
       return;
     }
-    
+
     const isSelected = selectedItems.some(i => i.id === item.id);
-    
+
     if (isSelected) {
       setSelectedItems(selectedItems.filter(i => i.id !== item.id));
     } else {
       setSelectedItems([...selectedItems, item]);
     }
   };
-  
+
   // Handle group selection
   const handleSelectGroup = (group) => {
     // If the group is already assigned to someone else, show an error
@@ -486,14 +485,14 @@ function AssignmentModal({
       setError(`This group is already assigned to another soldier. Please unassign it first.`);
       return;
     }
-    
+
     if (selectedGroup && selectedGroup.id === group.id) {
       setSelectedGroup(null);
     } else {
       setSelectedGroup(group);
     }
   };
-  
+
   // Filter soldiers based on search term
   const filteredSoldiers = soldiers.filter(soldier => {
     const searchTerm = soldierSearchTerm.toLowerCase();
@@ -503,7 +502,7 @@ function AssignmentModal({
       (soldier.rank && soldier.rank.toLowerCase().includes(searchTerm))
     );
   });
-  
+
   // Filter equipment based on search term
   const filteredEquipment = equipment.filter(item => {
     const searchTerm = equipmentSearchTerm.toLowerCase();
@@ -521,26 +520,26 @@ function AssignmentModal({
     try {
       setProcessingAssignment(true);
       setError('');
-      
+
       // Validate selections
       if (!selectedSoldier) {
         setError('Please select a soldier.');
         return;
       }
-      
+
       if (activeTab === 'items' && selectedItems.length === 0) {
         setError('Please select at least one item to assign.');
         return;
       }
-      
+
       if (activeTab === 'groups' && !selectedGroup) {
         setError('Please select a group to assign.');
         return;
       }
-      
+
       let successCount = 0;
       let failCount = 0;
-      
+
       // Assign individual items
       if (activeTab === 'items') {
         for (const item of selectedItems) {
@@ -555,7 +554,7 @@ function AssignmentModal({
                 }
               }
             });
-            
+
             // Also update in local DataStore
             try {
               const localItem = await DataStore.query(EquipmentItem, item.id);
@@ -569,7 +568,7 @@ function AssignmentModal({
             } catch (datastoreError) {
               console.log('DataStore sync error (non-critical):', datastoreError);
             }
-            
+
             successCount++;
           } catch (error) {
             console.error(`Error assigning item ${item.id}:`, error);
@@ -577,7 +576,7 @@ function AssignmentModal({
           }
         }
       }
-      
+
       // Assign a group and all its items
       if (activeTab === 'groups' && selectedGroup) {
         try {
@@ -592,7 +591,7 @@ function AssignmentModal({
               }
             }
           });
-          
+
           // Get all items in the group
           const itemsResponse = await client.graphql({
             query: `query GetItemsInGroup($groupID: ID!) {
@@ -605,9 +604,9 @@ function AssignmentModal({
             }`,
             variables: { groupID: selectedGroup.id }
           });
-          
+
           const groupItems = itemsResponse.data.equipmentItemsByGroupID.items;
-          
+
           // Assign all items in the group
           for (const item of groupItems) {
             try {
@@ -621,7 +620,7 @@ function AssignmentModal({
                   }
                 }
               });
-              
+
               successCount++;
             } catch (error) {
               console.error(`Error assigning group item ${item.id}:`, error);
@@ -633,23 +632,23 @@ function AssignmentModal({
           setError(`Failed to assign group: ${error.message}`);
         }
       }
-      
+
       // Show success message
       if (failCount === 0) {
         setSuccess(`Successfully assigned ${successCount} ${successCount === 1 ? 'item' : 'items'} to ${selectedSoldier.rank || ''} ${selectedSoldier.lastName}.`);
       } else {
         setSuccess(`Assigned ${successCount} ${successCount === 1 ? 'item' : 'items'}, but failed to assign ${failCount} ${failCount === 1 ? 'item' : 'items'}.`);
       }
-      
+
       // Notify parent component
       if (onAssignmentComplete) {
         onAssignmentComplete();
       }
-      
+
       // Reset selections and reload data
       setSelectedItems([]);
       setSelectedGroup(null);
-      
+
     } catch (error) {
       console.error('Error during assignment:', error);
       setError(`Assignment failed: ${error.message}`);
@@ -657,27 +656,27 @@ function AssignmentModal({
       setProcessingAssignment(false);
     }
   };
-  
+
   // Handle unassignment
   const handleUnassign = async () => {
     try {
       setProcessingAssignment(true);
       setError('');
-      
+
       // Validate selections
       if (activeTab === 'items' && selectedItems.length === 0) {
         setError('Please select at least one item to unassign.');
         return;
       }
-      
+
       if (activeTab === 'groups' && !selectedGroup) {
         setError('Please select a group to unassign.');
         return;
       }
-      
+
       let successCount = 0;
       let failCount = 0;
-      
+
       // Unassign individual items
       if (activeTab === 'items') {
         for (const item of selectedItems) {
@@ -692,7 +691,7 @@ function AssignmentModal({
                 }
               }
             });
-            
+
             successCount++;
           } catch (error) {
             console.error(`Error unassigning item ${item.id}:`, error);
@@ -700,7 +699,7 @@ function AssignmentModal({
           }
         }
       }
-      
+
       // Unassign a group and all its items
       if (activeTab === 'groups' && selectedGroup) {
         try {
@@ -715,7 +714,7 @@ function AssignmentModal({
               }
             }
           });
-          
+
           // Get all items in the group
           const itemsResponse = await client.graphql({
             query: `query GetItemsInGroup($groupID: ID!) {
@@ -728,9 +727,9 @@ function AssignmentModal({
             }`,
             variables: { groupID: selectedGroup.id }
           });
-          
+
           const groupItems = itemsResponse.data.equipmentItemsByGroupID.items;
-          
+
           // Unassign all items in the group
           for (const item of groupItems) {
             try {
@@ -744,7 +743,7 @@ function AssignmentModal({
                   }
                 }
               });
-              
+
               successCount++;
             } catch (error) {
               console.error(`Error unassigning group item ${item.id}:`, error);
@@ -756,23 +755,23 @@ function AssignmentModal({
           setError(`Failed to unassign group: ${error.message}`);
         }
       }
-      
+
       // Show success message
       if (failCount === 0) {
         setSuccess(`Successfully unassigned ${successCount} ${successCount === 1 ? 'item' : 'items'}.`);
       } else {
         setSuccess(`Unassigned ${successCount} ${successCount === 1 ? 'item' : 'items'}, but failed to unassign ${failCount} ${failCount === 1 ? 'item' : 'items'}.`);
       }
-      
+
       // Notify parent component
       if (onAssignmentComplete) {
         onAssignmentComplete();
       }
-      
+
       // Reset selections and reload data
       setSelectedItems([]);
       setSelectedGroup(null);
-      
+
     } catch (error) {
       console.error('Error during unassignment:', error);
       setError(`Unassignment failed: ${error.message}`);
@@ -793,16 +792,16 @@ function AssignmentModal({
       <div className="modal-content assignment-modal">
         <div className="modal-header">
           <h2>
-            {assignmentDirection === 'toSoldier' 
-              ? 'Assign Equipment to Soldier' 
+            {assignmentDirection === 'toSoldier'
+              ? 'Assign Equipment to Soldier'
               : 'Assign Soldier to Equipment'}
           </h2>
           <button className="close-button" onClick={onClose}>×</button>
         </div>
-        
+
         {error && <div className="error-message">{error}</div>}
         {success && <div className="success-message">{success}</div>}
-        
+
         {loading ? (
           <div className="loading">Loading data...</div>
         ) : (
@@ -810,9 +809,9 @@ function AssignmentModal({
             {/* Soldier Selection Section with Dropdown */}
             <div className="soldier-selection-section">
               <h3>Select Soldier</h3>
-              
+
               <div className="soldier-dropdown-container" ref={dropdownRef}>
-                <div 
+                <div
                   className="soldier-dropdown-header"
                   onClick={() => setDropdownOpen(!dropdownOpen)}
                 >
@@ -825,7 +824,7 @@ function AssignmentModal({
                   )}
                   <div className="dropdown-arrow">▼</div>
                 </div>
-                
+
                 {dropdownOpen && (
                   <div className="soldier-dropdown-content">
                     <input
@@ -836,12 +835,12 @@ function AssignmentModal({
                       onClick={(e) => e.stopPropagation()}
                       className="soldier-search-input"
                     />
-                    
+
                     <div className="soldier-dropdown-list">
                       {filteredSoldiers.length === 0 ? (
                         <div className="no-soldiers-message">
-                          {soldiers.length === 0 
-                            ? 'No soldiers found in this UIC.' 
+                          {soldiers.length === 0
+                            ? 'No soldiers found in this UIC.'
                             : 'No soldiers match your search.'}
                         </div>
                       ) : (
@@ -863,24 +862,24 @@ function AssignmentModal({
                 )}
               </div>
             </div>
-            
+
             {/* Equipment Selection Section */}
             <div className="equipment-selection-section">
               <div className="tabs">
-                <button 
+                <button
                   className={`tab-button ${activeTab === 'items' ? 'active' : ''}`}
                   onClick={() => setActiveTab('items')}
                 >
                   Individual Items
                 </button>
-                <button 
+                <button
                   className={`tab-button ${activeTab === 'groups' ? 'active' : ''}`}
                   onClick={() => setActiveTab('groups')}
                 >
                   Equipment Groups
                 </button>
               </div>
-              
+
               <div className="filter-options">
                 <div className="search-box">
                   <input
@@ -899,14 +898,14 @@ function AssignmentModal({
                   Show already assigned
                 </label>
               </div>
-              
+
               {/* Individual Items Tab */}
               {activeTab === 'items' && (
                 <div className="items-list">
                   {filteredEquipment.length === 0 ? (
                     <p className="no-data-message">
-                      No items found. {!showAssignedItems ? 
-                        'Try checking "Show already assigned" to see all items.' : 
+                      No items found. {!showAssignedItems ?
+                        'Try checking "Show already assigned" to see all items.' :
                         'Make sure equipment exists for this UIC.'}
                     </p>
                   ) : (
@@ -914,14 +913,14 @@ function AssignmentModal({
                       const isSelected = selectedItems.some(i => i.id === item.id);
                       const isAssigned = item.assignedToID !== null;
                       const isPartOfGroup = item.isPartOfGroup && item.groupID;
-                      
+
                       return (
                         <div
                           key={item.id}
                           className={`
-                            equipment-card 
-                            ${isSelected ? 'selected' : ''} 
-                            ${isAssigned ? 'assigned' : ''} 
+                            equipment-card
+                            ${isSelected ? 'selected' : ''}
+                            ${isAssigned ? 'assigned' : ''}
                             ${isPartOfGroup ? 'in-group' : ''}
                           `}
                           onClick={() => handleSelectItem(item)}
@@ -953,21 +952,21 @@ function AssignmentModal({
                   )}
                 </div>
               )}
-              
+
               {/* Groups Tab */}
               {activeTab === 'groups' && (
                 <div className="groups-list">
                   {groups.length === 0 ? (
                     <p className="no-data-message">
-                      No equipment groups found. {!showAssignedItems ? 
-                        'Try checking "Show already assigned" to see all groups.' : 
+                      No equipment groups found. {!showAssignedItems ?
+                        'Try checking "Show already assigned" to see all groups.' :
                         'You may need to create equipment groups first in the Manage Equipment section.'}
                     </p>
                   ) : (
                     groups.map(group => {
                       const isSelected = selectedGroup?.id === group.id;
                       const isAssigned = group.assignedToID !== null;
-                      
+
                       return (
                         <div
                           key={group.id}
@@ -993,22 +992,22 @@ function AssignmentModal({
             </div>
           </div>
         )}
-        
+
         <div className="modal-actions">
-          <button 
-            className="secondary-button" 
+          <button
+            className="secondary-button"
             onClick={onClose}
             disabled={processingAssignment}
           >
             Cancel
           </button>
-          
+
           {showAssignedItems && (
-            <button 
+            <button
               className="danger-button"
               onClick={handleUnassign}
               disabled={
-                processingAssignment || 
+                processingAssignment ||
                 (activeTab === 'items' && selectedItems.length === 0) ||
                 (activeTab === 'groups' && !selectedGroup)
               }
@@ -1016,13 +1015,13 @@ function AssignmentModal({
               {processingAssignment ? 'Processing...' : 'Unassign'}
             </button>
           )}
-          
-          <button 
+
+          <button
             className="primary-button"
             onClick={handleAssign}
             disabled={
-              processingAssignment || 
-              !selectedSoldier || 
+              processingAssignment ||
+              !selectedSoldier ||
               (activeTab === 'items' && selectedItems.length === 0) ||
               (activeTab === 'groups' && !selectedGroup)
             }

@@ -25,16 +25,16 @@ function Issue() {
   const [uicCode, setUicCode] = useState('');
   const [uicName, setUicName] = useState('');
   const [receiptActions, setReceiptActions] = useState({}); // Tracks which receipts have been downloaded/issued
-  
+
   // Flag to prevent reloading data
   const initialDataLoaded = useRef(false);
 
   // Custom hooks
-  const { 
+  const {
+    error: equipmentError,
     equipment,
     masterItems,
     groups,
-    groupsMap,
     itemStatusMap,
     selectedItems,
     expandedGroups,
@@ -48,17 +48,13 @@ function Issue() {
     toggleGroupExpansion,
     getGroupItems,
     getFilteredEquipment,
-    clearSelectedItems,
     refreshEquipmentData,
-    setError: setEquipmentError,
     setSelectedItems
   } = useEquipment(uicID);
 
   const {
     soldiers,
-    soldiersMap,
-    getSoldierFullName,
-    loadSoldiers
+    soldiersMap
   } = useSoldiers(uicID);
 
   const {
@@ -71,14 +67,14 @@ function Issue() {
   } = usePdfGeneration(uicCode, uicName);
 
   const {
+    error: handReceiptError,
+    success: handReceiptSuccess,
     activeHandReceipts,
     processingAction,
     loadActiveHandReceipts,
     getHandReceiptPdf,
     returnHandReceipt,
-    returnHandReceiptItem,
-    setError: setHandReceiptError,
-    setSuccess: setHandReceiptSuccess
+    returnHandReceiptItem
   } = useHandReceipts(uicID);
 
   // Load data only once on mount
@@ -91,31 +87,31 @@ function Issue() {
 
   // Safely handle error propagation from hooks
   useEffect(() => {
-    if (setEquipmentError && setEquipmentError !== error) {
-      setError(setEquipmentError);
+    if (equipmentError && equipmentError !== error) {
+      setError(equipmentError);
     }
-  }, [setEquipmentError]);
+  }, [equipmentError, error]);
 
   useEffect(() => {
-    if (setHandReceiptError && setHandReceiptError !== error) {
-      setError(setHandReceiptError);
+    if (handReceiptError && handReceiptError !== error) {
+      setError(handReceiptError);
     }
-  }, [setHandReceiptError]);
+  }, [handReceiptError, error]);
 
   useEffect(() => {
-    if (setHandReceiptSuccess && setHandReceiptSuccess !== success) {
-      setSuccess(setHandReceiptSuccess);
+    if (handReceiptSuccess && handReceiptSuccess !== success) {
+      setSuccess(handReceiptSuccess);
     }
-  }, [setHandReceiptSuccess]);
+  }, [handReceiptSuccess, success]);
 
   // Load all necessary data
   const loadInitialData = async () => {
     try {
       setLoading(true);
-      
+
       // Get current user and UIC
       const { username } = await getCurrentUser();
-      
+
       const userResponse = await client.graphql({
         query: `query GetUserByOwner($owner: String!) {
           usersByOwner(owner: $owner, limit: 1) {
@@ -127,14 +123,14 @@ function Issue() {
         }`,
         variables: { owner: username }
       });
-      
+
       const userData = userResponse.data.usersByOwner.items[0];
       if (!userData || !userData.uicID) {
         setError('You must be assigned to a UIC to view this page.');
         setLoading(false);
         return;
       }
-      
+
       const uicData = await client.graphql({
         query: `query GetUIC($id: ID!) {
           getUIC(id: $id) {
@@ -145,18 +141,18 @@ function Issue() {
         }`,
         variables: { id: userData.uicID }
       });
-      
+
       const uic = uicData.data.getUIC;
       if (!uic) {
         setError('Could not find the UIC you are assigned to.');
         setLoading(false);
         return;
       }
-      
+
       setUicID(uic.id);
       setUicCode(uic.uicCode);
       setUicName(uic.name);
-      
+
       setLoading(false);
     } catch (error) {
       console.error('Error loading initial data:', error);
@@ -169,20 +165,20 @@ function Issue() {
   const handleMarkItemsIssued = async (pdfFile) => {
     try {
       setError('');
-      
+
       // Get hand receipt items
-      const items = selectedItems.filter(item => 
+      const items = selectedItems.filter(item =>
         item.assignedToID === pdfFile.soldier.id
       );
-      
+
       if (items.length === 0) {
         setError('Could not find items for this receipt.');
         return;
       }
-      
+
       // Upload PDF to S3 first
       const s3Key = await uploadPdfToS3(pdfFile);
-      
+
       // Create HandReceiptStatus records for each item
       for (const item of items) {
         try {
@@ -202,7 +198,7 @@ function Issue() {
                 receiptNumber: pdfFile.receiptNumber,
                 status: 'ISSUED',
                 fromUIC: uicID,
-                toSoldierID: item.assignedToID, 
+                toSoldierID: item.assignedToID,
                 equipmentItemID: item.id,
                 issuedOn: new Date().toISOString(),
                 pdfS3Key: s3Key
@@ -213,17 +209,17 @@ function Issue() {
           console.error(`Error creating HandReceiptStatus for item ${item.id}:`, error);
         }
       }
-      
+
       // Mark this receipt as issued in local state
       setReceiptActions(prev => ({
         ...prev,
         [pdfFile.name]: { ...prev[pdfFile.name], issued: true }
       }));
-      
+
       // Refresh data ONLY after this explicit user action
       refreshEquipmentData();
       loadActiveHandReceipts(uicID);
-      
+
       setSuccess(`${items.length} items have been issued and locked on hand receipt ${pdfFile.receiptNumber}.`);
     } catch (error) {
       console.error('Error marking items as issued:', error);
@@ -238,12 +234,12 @@ function Issue() {
         setError('Please select at least one item to generate hand receipts.');
         return;
       }
-      
+
       setError('');
       setSuccess('');
-      
+
       const pdfFiles = await generatePdfs(selectedItems, soldiersMap);
-      
+
       setSuccess(`Generated ${pdfFiles.length} hand receipt${pdfFiles.length !== 1 ? 's' : ''}.`);
     } catch (error) {
       console.error('Error generating PDFs:', error);
@@ -254,7 +250,7 @@ function Issue() {
   // Handle downloading PDF - user action, no data refetch needed
   const handleDownloadPdf = (pdfFile) => {
     downloadPdf(pdfFile);
-    
+
     // Mark this PDF as downloaded so the Items Issued button can be enabled
     setReceiptActions(prev => ({
       ...prev,
@@ -269,7 +265,7 @@ function Issue() {
         setError('PDF not found for this receipt.');
         return;
       }
-      
+
       const pdfUrl = await getHandReceiptPdf(receipt.pdfS3Key);
       if (pdfUrl) {
         window.open(pdfUrl, '_blank');
@@ -285,10 +281,10 @@ function Issue() {
   return (
     <div className="page-container">
       <h1>Issue Equipment</h1>
-      
+
       {error && <div className="error-message">{error}</div>}
       {success && <div className="success-message">{success}</div>}
-      
+
       {loading ? (
         <div className="loading">Loading data...</div>
       ) : (
@@ -302,7 +298,7 @@ function Issue() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            
+
             <div className="filter-controls">
               <div className="filter-group">
                 <label>Filter by Soldier:</label>
@@ -318,7 +314,7 @@ function Issue() {
                   ))}
                 </select>
               </div>
-              
+
               <div className="filter-group">
                 <label>Filter by Status:</label>
                 <select
@@ -334,18 +330,18 @@ function Issue() {
                 </select>
               </div>
             </div>
-            
+
             <div className="action-buttons">
-              <button 
+              <button
                 className="primary-button"
                 onClick={handleGeneratePdfs}
                 disabled={selectedItems.length === 0 || generating}
               >
                 {generating ? 'Generating...' : 'Generate Hand Receipts'}
               </button>
-              
+
               {generatedPdfs.length > 0 && (
-                <button 
+                <button
                   className="secondary-button"
                   onClick={downloadAllPdfs}
                 >
@@ -354,10 +350,10 @@ function Issue() {
               )}
             </div>
           </div>
-          
+
           <div className="equipment-list-container">
             <h2>Assigned Equipment</h2>
-            
+
             {equipment.length === 0 ? (
               <p className="no-data-message">No assigned equipment found for this unit.</p>
             ) : (
@@ -365,25 +361,25 @@ function Issue() {
                 <div className="equipment-table">
                   <div className="equipment-table-header">
                     <div className="checkbox-cell">
-                      <input 
-                        type="checkbox" 
-                        checked={filteredEquipment.length > 0 && 
+                      <input
+                        type="checkbox"
+                        checked={filteredEquipment.length > 0 &&
                                 filteredEquipment.every(item => selectedItems.some(selected => selected.id === item.id))}
                         onChange={() => {
                           // If all visible items are selected, deselect them
                           if (filteredEquipment.every(item => selectedItems.some(selected => selected.id === item.id))) {
                             // Remove all currently visible items from selection
-                            setSelectedItems(selectedItems.filter(selected => 
+                            setSelectedItems(selectedItems.filter(selected =>
                               !filteredEquipment.some(item => item.id === selected.id)
                             ));
                           } else {
                             // Add all currently visible items to selection
-                            const visibleItemsToAdd = filteredEquipment.filter(item => 
+                            const visibleItemsToAdd = filteredEquipment.filter(item =>
                               !selectedItems.some(selected => selected.id === item.id) &&
                               // Don't select items that are on hand receipts
                               !(itemStatusMap[item.id] && itemStatusMap[item.id].status === 'HAND_RECEIPTED')
                             );
-                            
+
                             setSelectedItems([...selectedItems, ...visibleItemsToAdd]);
                           }
                         }}
@@ -396,29 +392,29 @@ function Issue() {
                     <div className="equipment-soldier">Assigned To</div>
                     <div className="equipment-status">Status</div>
                   </div>
-                  
+
                   {/* Groups section */}
                   {groups.map(group => {
                     const groupItems = getGroupItems(group.id);
                     const soldier = soldiersMap[group.assignedToID];
                     const isExpanded = expandedGroups[group.id];
-                    
+
                     if (groupItems.length === 0) return null;
-                    
+
                     // Check if any group items match the current filters
-                    const hasVisibleItems = groupItems.some(item => 
+                    const hasVisibleItems = groupItems.some(item =>
                       (filterBySoldier === 'all' || item.assignedToID === filterBySoldier) &&
                       (filterByStatus === 'all' || item.maintenanceStatus === filterByStatus) &&
-                      (searchTerm === '' || 
+                      (searchTerm === '' ||
                         (masterItems[item.equipmentMasterID]?.commonName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                         item.nsn.toLowerCase().includes(searchTerm.toLowerCase()) ||
                         (item.serialNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                         (item.stockNumber || '').toLowerCase().includes(searchTerm.toLowerCase())
                       )
                     );
-                    
+
                     if (!hasVisibleItems) return null;
-                    
+
                     return (
                       <div key={group.id} className="equipment-group">
                         <div className="equipment-group-header" onClick={() => toggleGroupExpansion(group.id)}>
@@ -429,35 +425,35 @@ function Issue() {
                             {soldier ? `${soldier.rank} ${soldier.lastName}, ${soldier.firstName}` : 'Unknown Soldier'}
                           </div>
                         </div>
-                        
+
                         {isExpanded && (
                           <div className="equipment-group-items">
                             {groupItems.map(item => {
                               const masterData = masterItems[item.equipmentMasterID];
                               const isSelected = selectedItems.some(i => i.id === item.id);
-                              
+
                               // Check if item matches the current filters
-                              const matchesFilter = 
+                              const matchesFilter =
                                 (filterBySoldier === 'all' || item.assignedToID === filterBySoldier) &&
                                 (filterByStatus === 'all' || item.maintenanceStatus === filterByStatus) &&
-                                (searchTerm === '' || 
+                                (searchTerm === '' ||
                                   (masterData?.commonName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                                   item.nsn.toLowerCase().includes(searchTerm.toLowerCase()) ||
                                   (item.serialNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                                   (item.stockNumber || '').toLowerCase().includes(searchTerm.toLowerCase())
                                 );
-                              
+
                               if (!matchesFilter) return null;
-                              
+
                               return (
-                                <div 
-                                  key={item.id} 
+                                <div
+                                  key={item.id}
                                   className={`equipment-item ${isSelected ? 'selected' : ''}`}
                                   onClick={() => toggleItemSelection(item)}
                                 >
                                   <div className="checkbox-cell">
-                                    <input 
-                                      type="checkbox" 
+                                    <input
+                                      type="checkbox"
                                       checked={isSelected}
                                       onChange={() => {}} // Handled by the row click
                                     />
@@ -478,7 +474,7 @@ function Issue() {
                       </div>
                     );
                   })}
-                  
+
                   {/* Individual items not in groups */}
                   {filteredEquipment
                     .filter(item => !item.isPartOfGroup || !item.groupID)
@@ -486,16 +482,16 @@ function Issue() {
                       const masterData = masterItems[item.equipmentMasterID];
                       const soldier = soldiersMap[item.assignedToID];
                       const isSelected = selectedItems.some(i => i.id === item.id);
-                      
+
                       return (
-                        <div 
-                          key={item.id} 
+                        <div
+                          key={item.id}
                           className={`equipment-item ${isSelected ? 'selected' : ''}`}
                           onClick={() => toggleItemSelection(item)}
                         >
                           <div className="checkbox-cell">
-                            <input 
-                              type="checkbox" 
+                            <input
+                              type="checkbox"
                               checked={isSelected}
                               onChange={() => {}} // Handled by the row click
                             />
@@ -516,7 +512,7 @@ function Issue() {
               </div>
             )}
           </div>
-          
+
           {generatedPdfs.length > 0 && (
             <div className="generated-pdfs">
               <h2>Generated Hand Receipts</h2>
@@ -530,14 +526,14 @@ function Issue() {
                     <div key={index} className="pdf-item">
                       <div className="pdf-name">{pdf.name}</div>
                       <div className="pdf-actions">
-                        <button 
+                        <button
                           className="download-button"
                           onClick={() => handleDownloadPdf(pdf)}
                         >
                           Download
                         </button>
-                        
-                        <button 
+
+                        <button
                           className={`issue-button ${isDownloaded && !isIssued ? 'active' : ''}`}
                           onClick={() => handleMarkItemsIssued(pdf)}
                           disabled={!isDownloaded || isIssued || processingAction}
@@ -551,9 +547,9 @@ function Issue() {
               </div>
             </div>
           )}
-          
+
           {/* Add Active Hand Receipts component */}
-          <ActiveHandReceipts 
+          <ActiveHandReceipts
             activeHandReceipts={activeHandReceipts}
             onViewPdf={handleViewActivePdf}
             onReturnItems={returnHandReceipt}
@@ -566,4 +562,4 @@ function Issue() {
   );
 }
 
-export default Issue; 
+export default Issue;

@@ -1,2 +1,3 @@
 src/models/models
+src/models/index.d.ts
 amplify-codegen-temp/models/models

@@ -4,11 +4,10 @@ import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
 import { Amplify } from 'aws-amplify';
-import { fetchAuthSession, getCurrentUser } from 'aws-amplify/auth';
 import { DataStore } from '@aws-amplify/datastore';
-import { User, UIC, UICMembershipRequest } from './models';
 import awsconfig from './aws-exports';
-import { initializeDataStore, setupAuthListener } from './utils/DataSyncManager';
+import { setupAuthListener } from './utils/DataSyncManager';
+import * as serviceWorkerRegistration from './serviceWorkerRegistration';
 
 // Configure Amplify
 Amplify.configure(awsconfig);
@@ -17,23 +16,7 @@ Amplify.configure(awsconfig);
 DataStore.configure({
   errorHandler: error => {
     console.log('DataStore error', error);
-  },
-  // Use the syncWithoutCredentials option for models that should be available to all users
-  syncWithoutCredentials: true, 
-  // Configure model-specific sync behaviors
-  syncExpressions: {
-    User: () => c => c.owner.eq('${identityId}'),
-    UIC: () => c => c, // Get all UICs
-    UICMembershipRequest: () => c => c.or(c => [
-      c.userID.eq('${identityId}'),
-      // Add additional conditions for approvers here if needed
-    ])
   }
-});
-
-// Initialize our data sync manager
-initializeDataStore().catch(error => {
-  console.error('Failed to initialize DataStore:', error);
 });
 
 // Set up auth listener for sign-in/sign-out events
@@ -50,3 +33,7 @@ root.render(
 // to log results (for example: reportWebVitals(console.log))
 // or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
 reportWebVitals();
+
+// The PWA shell is not a source of business truth. Keep service workers
+// disabled until caching/update behavior is deliberately reintroduced.
+serviceWorkerRegistration.unregister();

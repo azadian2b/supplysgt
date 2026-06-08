@@ -17,13 +17,6 @@ export type AmplifyDependentResourcesAttributes = {
     }
   },
   "function": {
-    "approvalNotifier": {
-      "Arn": "string",
-      "LambdaExecutionRole": "string",
-      "LambdaExecutionRoleArn": "string",
-      "Name": "string",
-      "Region": "string"
-    },
     "supplysgtapp2f24982cCustomMessage": {
       "Arn": "string",
       "LambdaExecutionRole": "string",

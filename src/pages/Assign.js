@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { DataStore, SortDirection } from '@aws-amplify/datastore';
 import { getCurrentUser } from 'aws-amplify/auth';
-import { User, Soldier, UIC, Role } from '../models';
+import { User, Soldier, UIC } from '../models';
 import './Pages.css';
 import '../styles/Assign.css';
 import '../styles/RosterStyles.css'; // Import new roster styling
@@ -35,44 +35,44 @@ function Assign() {
     const fetchUserAndSoldiers = async () => {
       try {
         setLoading(true);
-        
+
         // Get current authenticated user
         const { username } = await getCurrentUser();
-        
+
         // Get user profile
         const userProfiles = await DataStore.query(User, u => u.owner.eq(username));
         if (userProfiles.length === 0) {
           setLoading(false);
           return;
         }
-        
+
         const userProfile = userProfiles[0];
         setCurrentUser(userProfile);
-        
+
         // Get UIC
         if (userProfile.uicID) {
           const uic = await DataStore.query(UIC, userProfile.uicID);
           setCurrentUIC(uic);
-          
+
           // Fetch soldiers for this UIC
           await fetchSoldiers(userProfile.uicID);
         }
-        
+
         setLoading(false);
       } catch (error) {
         console.error('Error fetching data:', error);
         setLoading(false);
       }
     };
-    
+
     fetchUserAndSoldiers();
   }, []);
-  
+
   // Separate function to fetch soldiers that can be called after adding new soldiers
   const fetchSoldiers = async (uicID) => {
     try {
       const soldiersList = await DataStore.query(
-        Soldier, 
+        Soldier,
         s => s.uicID.eq(uicID),
         {
           sort: s => s.lastName(SortDirection.ASCENDING)
@@ -83,39 +83,39 @@ function Assign() {
       console.error('Error fetching soldiers:', error);
     }
   };
-  
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setNewSoldier(prev => ({ ...prev, [name]: value }));
-    
+
     // Clear any error for this field
     if (formErrors[name]) {
       setFormErrors(prev => ({ ...prev, [name]: null }));
     }
   };
-  
+
   const validateForm = () => {
     const errors = {};
-    
+
     if (!newSoldier.firstName.trim()) {
       errors.firstName = 'First name is required';
     }
-    
+
     if (!newSoldier.lastName.trim()) {
       errors.lastName = 'Last name is required';
     }
-    
+
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
-  
+
   const handleAddSoldier = async (e) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
-    
+
     try {
       // Create new soldier record
       await DataStore.save(
@@ -132,7 +132,7 @@ function Assign() {
           updatedAt: new Date().toISOString()
         })
       );
-      
+
       // Reset form
       setNewSoldier({
         firstName: '',
@@ -141,19 +141,19 @@ function Assign() {
         email: '',
         role: ROLES.SOLDIER // Use standardized role value
       });
-      
+
       // Hide form
       setShowAddForm(false);
-      
+
       // Refresh soldiers list
       await fetchSoldiers(currentUIC.id);
-      
+
     } catch (error) {
       console.error('Error adding soldier:', error);
       alert('Failed to add soldier. Please try again.');
     }
   };
-  
+
   // Add this function to handle editing a soldier
   const handleEditClick = (soldier) => {
     setEditingSoldier(soldier);
@@ -185,16 +185,16 @@ function Assign() {
   // Save edited soldier data
   const handleSaveEdit = async (e) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
-    
+
     try {
       if (!editingSoldier) {
         throw new Error('No soldier selected for editing');
       }
-      
+
       // Update soldier record
       await DataStore.save(
         Soldier.copyOf(editingSoldier, updated => {
@@ -206,15 +206,15 @@ function Assign() {
           updated.updatedAt = new Date().toISOString();
         })
       );
-      
+
       // NEW CODE: Sync changes to linked user profile if soldier has an account
       if (editingSoldier.hasAccount && editingSoldier.userId) {
         // Find the associated user record
         const linkedUser = await DataStore.query(User, editingSoldier.userId);
-        
+
         if (linkedUser) {
           console.log('Found linked user account to update:', linkedUser);
-          
+
           // Update the user record with the soldier's updated information
           await DataStore.save(
             User.copyOf(linkedUser, updated => {
@@ -228,11 +228,11 @@ function Assign() {
               }
             })
           );
-          
+
           console.log('Updated linked user profile with new soldier information');
         }
       }
-      
+
       // Reset form
       setNewSoldier({
         firstName: '',
@@ -241,20 +241,20 @@ function Assign() {
         email: '',
         role: ROLES.SOLDIER
       });
-      
+
       // Hide form
       setShowEditForm(false);
       setEditingSoldier(null);
-      
+
       // Refresh soldiers list
       await fetchSoldiers(currentUIC.id);
-      
+
     } catch (error) {
       console.error('Error updating soldier:', error);
       alert('Failed to update soldier. Please try again.');
     }
   };
-  
+
   // Add these functions for delete functionality
   const handleDeleteClick = (soldier) => {
     setDeletingSoldier(soldier);
@@ -275,15 +275,15 @@ function Assign() {
       if (!deletingSoldier) {
         throw new Error('No soldier selected for deletion');
       }
-      
+
       // Check if this soldier has a linked user account
       if (deletingSoldier.hasAccount && deletingSoldier.userId) {
         // Find the associated user record
         const linkedUser = await DataStore.query(User, deletingSoldier.userId);
-        
+
         if (linkedUser) {
           console.log('Found linked user account:', linkedUser);
-          
+
           // Update the user record to remove the UIC and linkedSoldierId
           await DataStore.save(
             User.copyOf(linkedUser, updated => {
@@ -291,70 +291,70 @@ function Assign() {
               if (updated.uicID === currentUIC.id) {
                 updated.uicID = null;
               }
-              
+
               // Clear the linkedSoldierId reference
               updated.linkedSoldierId = null;
             })
           );
-          
+
           console.log('Updated linked user to remove UIC association');
         }
       }
-      
+
       // Delete the soldier record
       await DataStore.delete(deletingSoldier);
-      
+
       // Hide modal
       setShowDeleteModal(false);
       setDeletingSoldier(null);
-      
+
       // Refresh soldiers list
       await fetchSoldiers(currentUIC.id);
-      
+
       // Show success message
       alert('Soldier was successfully deleted from the roster.');
-      
+
     } catch (error) {
       console.error('Error deleting soldier:', error);
       alert('Failed to delete soldier. Please try again.');
     }
   };
-  
+
   // Function to handle clicking the assign equipment button
   const handleAssignEquipment = (soldier) => {
     setAssigningSoldier(soldier);
     setShowAssignmentModal(true);
   };
-  
+
   // Function to handle assignment completion
   const handleAssignmentComplete = async () => {
     // Refresh the soldiers list to show updated assignments
     try {
       // First try to sync the DataStore if in online mode
       const isOnlineMode = DataStoreUtil.isOnlineMode();
-      
+
       if (isOnlineMode) {
         // If in online mode, we should force refresh assigned data
         console.log('Assignment completed, synchronizing DataStore...');
-        
+
         // If we know which soldier was assigned to, specifically sync that one
         if (assigningSoldier) {
           await DataStoreUtil.syncEntity(Soldier, assigningSoldier.id);
         }
       }
-      
+
       // Then fetch fresh data
       await fetchSoldiers(currentUIC.id);
-      
+
     } catch (error) {
       console.error('Error refreshing soldiers after assignment:', error);
     }
   };
-  
+
   if (loading) {
     return <div className="loading">Loading...</div>;
   }
-  
+
   if (!currentUser) {
     return (
       <div className="page-container">
@@ -363,7 +363,7 @@ function Assign() {
       </div>
     );
   }
-  
+
   if (!currentUIC) {
     return (
       <div className="page-container">
@@ -372,10 +372,10 @@ function Assign() {
       </div>
     );
   }
-  
+
   // Check if user has appropriate role to manage personnel
   const canManagePersonnel = ['COMMANDER', 'FIRST_SERGEANT', 'SUPPLY_SERGEANT'].includes(currentUser.role);
-  
+
   if (!canManagePersonnel) {
     return (
       <div className="page-container">
@@ -384,11 +384,11 @@ function Assign() {
       </div>
     );
   }
-  
+
   return (
     <div className="page-container">
       <h1>UIC {currentUIC.uicCode} - Personnel Roster</h1>
-      
+
       <div className="roster-actions">
         <button className="add-soldier-btn" onClick={() => {
           setShowAddForm(!showAddForm);
@@ -415,7 +415,7 @@ function Assign() {
           {showAddForm ? 'Cancel' : 'Add Soldier'}
         </button>
       </div>
-      
+
       {showAddForm && (
         <div className="add-soldier-form">
           <h2>Add New Soldier</h2>
@@ -433,7 +433,7 @@ function Assign() {
                 />
                 {formErrors.firstName && <div className="error">{formErrors.firstName}</div>}
               </div>
-              
+
               <div className="form-group">
                 <label htmlFor="lastName">Last Name *</label>
                 <input
@@ -447,7 +447,7 @@ function Assign() {
                 {formErrors.lastName && <div className="error">{formErrors.lastName}</div>}
               </div>
             </div>
-            
+
             <div className="form-row">
               <div className="form-group">
                 <label htmlFor="rank">Rank</label>
@@ -459,7 +459,7 @@ function Assign() {
                   onChange={handleInputChange}
                 />
               </div>
-              
+
               <div className="form-group">
                 <label htmlFor="email">Email</label>
                 <input
@@ -471,7 +471,7 @@ function Assign() {
                 />
               </div>
             </div>
-            
+
             <div className="form-row">
               <div className="form-group">
                 <label htmlFor="role">Role</label>
@@ -488,7 +488,7 @@ function Assign() {
                 </select>
               </div>
             </div>
-            
+
             <div className="form-actions">
               <button type="submit" className="submit-btn">Add Soldier</button>
               <button type="button" className="cancel-btn" onClick={() => setShowAddForm(false)}>Cancel</button>
@@ -496,7 +496,7 @@ function Assign() {
           </form>
         </div>
       )}
-      
+
       {showEditForm && editingSoldier && (
         <div className="edit-soldier-form">
           <h2>Edit Soldier</h2>
@@ -514,7 +514,7 @@ function Assign() {
                 />
                 {formErrors.firstName && <div className="error">{formErrors.firstName}</div>}
               </div>
-              
+
               <div className="form-group">
                 <label htmlFor="lastName">Last Name *</label>
                 <input
@@ -528,7 +528,7 @@ function Assign() {
                 {formErrors.lastName && <div className="error">{formErrors.lastName}</div>}
               </div>
             </div>
-            
+
             <div className="form-row">
               <div className="form-group">
                 <label htmlFor="rank">Rank</label>
@@ -540,7 +540,7 @@ function Assign() {
                   onChange={handleInputChange}
                 />
               </div>
-              
+
               <div className="form-group">
                 <label htmlFor="email">Email</label>
                 <input
@@ -552,7 +552,7 @@ function Assign() {
                 />
               </div>
             </div>
-            
+
             <div className="form-row">
               <div className="form-group">
                 <label htmlFor="role">Role</label>
@@ -569,7 +569,7 @@ function Assign() {
                 </select>
               </div>
             </div>
-            
+
             <div className="form-actions">
               <button type="submit" className="submit-btn">Save Changes</button>
               <button type="button" className="cancel-btn" onClick={handleCancelEdit}>Cancel</button>
@@ -577,7 +577,7 @@ function Assign() {
           </form>
         </div>
       )}
-      
+
       {/* Delete Soldier Modal - new code */}
       {showDeleteModal && deletingSoldier && (
         <div className="delete-soldier-modal">
@@ -586,20 +586,20 @@ function Assign() {
             <p className="warning-text">
               Are you sure you want to delete this soldier from the roster?
             </p>
-            
+
             <div className="soldier-details">
               <p><strong>Name:</strong> {deletingSoldier.rank} {deletingSoldier.firstName} {deletingSoldier.lastName}</p>
               <p><strong>Role:</strong> {getRoleLabel(deletingSoldier.role)}</p>
               <p><strong>Status:</strong> {deletingSoldier.hasAccount ? 'Has account' : 'No account'}</p>
             </div>
-            
+
             <div className="warning-box">
               <p>This action cannot be undone. The soldier will be permanently removed from the roster.</p>
               {deletingSoldier?.hasAccount && (
                 <p>Note: This soldier has a user account. Deleting them from the roster will remove their UIC association, but their account will remain active.</p>
               )}
             </div>
-            
+
             <div className="modal-actions">
               <button type="button" className="cancel-btn" onClick={handleCancelDelete}>Cancel</button>
               <button type="button" className="delete-btn" onClick={handleConfirmDelete}>Delete Soldier</button>
@@ -607,7 +607,7 @@ function Assign() {
           </div>
         </div>
       )}
-      
+
       <div className="soldier-roster">
         <h2>Personnel Roster</h2>
         {soldiers.length === 0 ? (
@@ -634,19 +634,19 @@ function Assign() {
                   <td>{soldier.hasAccount ? 'Active' : 'Not Registered'}</td>
                   <td>
                     <div className="action-buttons">
-                      <button 
-                        className="edit-btn" 
+                      <button
+                        className="edit-btn"
                         onClick={() => handleEditClick(soldier)}
                       >
                         Edit
                       </button>
-                      <button 
-                        className="delete-btn" 
+                      <button
+                        className="delete-btn"
                         onClick={() => handleDeleteClick(soldier)}
                       >
                         Delete
                       </button>
-                      <button 
+                      <button
                         className="assign-btn"
                         onClick={() => handleAssignEquipment(soldier)}
                       >
@@ -660,7 +660,7 @@ function Assign() {
           </table>
         )}
       </div>
-      
+
       {/* Add Assignment Modal */}
       {showAssignmentModal && (
         <AssignmentModal
@@ -677,4 +677,4 @@ function Assign() {
   );
 }
 
-export default Assign; 
+export default Assign;

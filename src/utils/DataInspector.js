@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { generateClient } from 'aws-amplify/api';
 import './DataInspector.css';
 
@@ -17,69 +17,69 @@ function DataInspector() {
     try {
       setLoading(true);
       setError(null);
-      
+
       // Get list of all IndexedDB databases
       const databases = await window.indexedDB.databases();
       console.log('Available IndexedDB databases:', databases);
-      
+
       // Look for Amplify-related databases
-      const amplifyDatabases = databases.filter(db => 
-        db.name.includes('amplify') || 
+      const amplifyDatabases = databases.filter(db =>
+        db.name.includes('amplify') ||
         db.name.includes('DataStore')
       );
-      
+
       if (amplifyDatabases.length === 0) {
         setError('No Amplify databases found in IndexedDB');
         setLoading(false);
         return;
       }
-      
+
       // Extract data from each database
       const dbData = {};
-      
+
       for (const dbInfo of amplifyDatabases) {
         const dbName = dbInfo.name;
         dbData[dbName] = { stores: {} };
-        
+
         // Open the database
         const dbOpenRequest = indexedDB.open(dbName);
-        
+
         await new Promise((resolve, reject) => {
           dbOpenRequest.onerror = (event) => {
             console.error(`Error opening ${dbName}:`, event);
             reject(`Error opening ${dbName}`);
           };
-          
+
           dbOpenRequest.onsuccess = async (event) => {
             const db = event.target.result;
             const storeNames = Array.from(db.objectStoreNames);
-            
+
             // Load data from each object store
             for (const storeName of storeNames) {
               try {
                 const transaction = db.transaction(storeName, 'readonly');
                 const store = transaction.objectStore(storeName);
-                
+
                 // Get all records from this store
                 const storeData = await new Promise((resolveStore, rejectStore) => {
                   const request = store.getAll();
-                  
+
                   request.onerror = (e) => rejectStore(`Error reading ${storeName}`);
                   request.onsuccess = (e) => resolveStore(e.target.result);
                 });
-                
+
                 dbData[dbName].stores[storeName] = storeData;
               } catch (storeError) {
                 console.error(`Error reading store ${storeName}:`, storeError);
                 dbData[dbName].stores[storeName] = { error: storeError.message };
               }
             }
-            
+
             resolve();
           };
         });
       }
-      
+
       setIndexedDBData(dbData);
       console.log('IndexedDB data:', dbData);
     } catch (error) {
@@ -89,13 +89,13 @@ function DataInspector() {
       setLoading(false);
     }
   };
-  
+
   // Function to fetch equipment items directly from API
   const fetchDirectFromAPI = async () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       // Get user's UIC
       const userResponse = await client.graphql({
         query: `query GetCurrentUser {
@@ -107,14 +107,14 @@ function DataInspector() {
           }
         }`
       });
-      
+
       const userData = userResponse.data.usersByOwner.items[0];
       if (!userData) {
         setError('No user data found');
         setLoading(false);
         return;
       }
-      
+
       // Fetch equipment items for this UIC - with ALL fields
       const equipmentResponse = await client.graphql({
         query: `query GetEquipmentByUIC($uicID: ID!) {
@@ -142,13 +142,13 @@ function DataInspector() {
         }`,
         variables: { uicID: userData.uicID }
       });
-      
+
       const items = equipmentResponse.data.equipmentItemsByUicID.items;
-      
+
       // Fetch DynamoDB direct info
       const region = (window.aws_config || {}).region || 'us-east-1';
       const tableName = 'EquipmentItem-' + (window.aws_config || {}).projectSuffix || 'unknown';
-      
+
       setApiData({
         uicID: userData.uicID,
         itemCount: items.length,
@@ -159,7 +159,7 @@ function DataInspector() {
           url: `https://${region}.console.aws.amazon.com/dynamodb/home?region=${region}#tables:selected=${tableName}`
         }
       });
-      
+
       console.log('API data:', items);
     } catch (error) {
       console.error('Error fetching from API:', error);
@@ -168,13 +168,13 @@ function DataInspector() {
       setLoading(false);
     }
   };
-  
+
   // New function to check for soft-deleted items
   const checkForSoftDeletedItems = async () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       // Get user's UIC
       const userResponse = await client.graphql({
         query: `query GetCurrentUser {
@@ -186,14 +186,14 @@ function DataInspector() {
           }
         }`
       });
-      
+
       const userData = userResponse.data.usersByOwner.items[0];
       if (!userData) {
         setError('No user data found');
         setLoading(false);
         return;
       }
-      
+
       // Fetch ALL equipment items for this UIC including "deleted" ones
       const equipmentResponse = await client.graphql({
         query: `query GetEquipmentByUIC($uicID: ID!) {
@@ -213,11 +213,11 @@ function DataInspector() {
         }`,
         variables: { uicID: userData.uicID }
       });
-      
+
       const allItems = equipmentResponse.data.equipmentItemsByUicID.items;
       const deletedItems = allItems.filter(item => item._deleted);
       const activeItems = allItems.filter(item => !item._deleted);
-      
+
       // Look for duplicate serial numbers
       const serialNumberGroups = {};
       activeItems.forEach(item => {
@@ -229,7 +229,7 @@ function DataInspector() {
           serialNumberGroups[key].push(item);
         }
       });
-      
+
       // Find groups with duplicates
       const duplicateGroups = Object.entries(serialNumberGroups)
         .filter(([key, items]) => items.length > 1)
@@ -237,7 +237,7 @@ function DataInspector() {
           key,
           items: items.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
         }));
-      
+
       setApiData({
         uicID: userData.uicID,
         totalItems: allItems.length,
@@ -249,7 +249,7 @@ function DataInspector() {
           duplicates: duplicateGroups
         }
       });
-      
+
       console.log('Deleted & duplicate analysis:', {
         totalItems: allItems.length,
         activeItems: activeItems.length,
@@ -265,18 +265,18 @@ function DataInspector() {
       setLoading(false);
     }
   };
-  
+
   // Function to clear IndexedDB
   const clearIndexedDB = async (dbName = null) => {
     try {
-      if (!window.confirm(dbName 
-        ? `Are you sure you want to delete the "${dbName}" database?` 
+      if (!window.confirm(dbName
+        ? `Are you sure you want to delete the "${dbName}" database?`
         : 'Are you sure you want to delete ALL Amplify databases?')) {
         return;
       }
-      
+
       setLoading(true);
-      
+
       if (dbName) {
         // Delete specific database
         await window.indexedDB.deleteDatabase(dbName);
@@ -284,17 +284,17 @@ function DataInspector() {
       } else {
         // Delete all Amplify databases
         const databases = await window.indexedDB.databases();
-        const amplifyDatabases = databases.filter(db => 
-          db.name.includes('amplify') || 
+        const amplifyDatabases = databases.filter(db =>
+          db.name.includes('amplify') ||
           db.name.includes('DataStore')
         );
-        
+
         for (const db of amplifyDatabases) {
           await window.indexedDB.deleteDatabase(db.name);
           console.log(`Deleted database: ${db.name}`);
         }
       }
-      
+
       // Refresh the data
       await scanIndexedDB();
     } catch (error) {
@@ -310,10 +310,10 @@ function DataInspector() {
     if (!window.confirm(`Are you sure you want to delete item ${id.substring(0, 8)}...? This cannot be undone.`)) {
       return;
     }
-    
+
     try {
       setLoading(true);
-      
+
       // Execute a direct delete mutation with no condition
       const response = await client.graphql({
         query: `mutation ForceDeleteItem($id: ID!) {
@@ -323,10 +323,10 @@ function DataInspector() {
         }`,
         variables: { id }
       });
-      
+
       console.log('Direct delete response:', response);
       alert(`Item ${id.substring(0, 8)}... has been deleted directly from DynamoDB.`);
-      
+
       // Refresh the data
       if (apiData.items.duplicates) {
         await checkForSoftDeletedItems();
@@ -340,16 +340,16 @@ function DataInspector() {
       setLoading(false);
     }
   };
-  
+
   // Function to cleanup a duplicate group by keeping only the newest item
   const cleanupDuplicateGroup = async (group) => {
     if (!window.confirm(`Are you sure you want to clean up this group? This will keep the newest item and delete all others.`)) {
       return;
     }
-    
+
     try {
       setLoading(true);
-      
+
       // Keep the newest item (first in the sorted list) and delete the rest
       const itemsToDelete = group.items.slice(1);
       const results = {
@@ -357,7 +357,7 @@ function DataInspector() {
         failed: 0,
         errors: []
       };
-      
+
       for (const item of itemsToDelete) {
         try {
           await client.graphql({
@@ -368,7 +368,7 @@ function DataInspector() {
             }`,
             variables: { id: item.id }
           });
-          
+
           results.success++;
           console.log(`Successfully deleted duplicate item ${item.id}`);
         } catch (error) {
@@ -380,14 +380,14 @@ function DataInspector() {
           });
         }
       }
-      
+
       // Show results
       if (results.failed > 0) {
         alert(`Cleanup completed with issues. Successfully deleted ${results.success} items, ${results.failed} items failed.`);
       } else {
         alert(`Successfully cleaned up group. Deleted ${results.success} duplicate items.`);
       }
-      
+
       // Refresh data
       await checkForSoftDeletedItems();
     } catch (error) {
@@ -401,30 +401,30 @@ function DataInspector() {
   return (
     <div className="data-inspector">
       <h2>Amplify Data Inspector</h2>
-      
+
       <div className="inspector-actions">
-        <button 
+        <button
           onClick={scanIndexedDB}
           disabled={loading}
         >
           {loading ? 'Scanning...' : 'Scan IndexedDB'}
         </button>
-        
-        <button 
+
+        <button
           onClick={fetchDirectFromAPI}
           disabled={loading}
         >
           {loading ? 'Fetching...' : 'Fetch from API'}
         </button>
-        
-        <button 
+
+        <button
           onClick={checkForSoftDeletedItems}
           disabled={loading}
         >
           {loading ? 'Checking...' : 'Check Deleted Items'}
         </button>
-        
-        <button 
+
+        <button
           onClick={() => clearIndexedDB()}
           disabled={loading}
           className="danger-button"
@@ -432,9 +432,9 @@ function DataInspector() {
           Clear All Amplify Data
         </button>
       </div>
-      
+
       {error && <div className="inspector-error">{error}</div>}
-      
+
       {indexedDBData && (
         <div className="inspector-results">
           <h3>IndexedDB Data</h3>
@@ -449,7 +449,7 @@ function DataInspector() {
                   Delete
                 </button>
               </div>
-              
+
               {Object.entries(dbData.stores).map(([storeName, storeData]) => (
                 <div key={storeName} className="store-container">
                   <h5>{storeName} ({storeData.length || 0} items)</h5>
@@ -467,7 +467,7 @@ function DataInspector() {
           ))}
         </div>
       )}
-      
+
       {apiData && apiData.items && apiData.items.duplicates && (
         <div className="inspector-results">
           <h3>Deleted & Duplicate Items Analysis</h3>
@@ -477,7 +477,7 @@ function DataInspector() {
             <div>Deleted Items: {apiData.deletedItems}</div>
             <div>Duplicate Groups: {apiData.duplicateGroups}</div>
           </div>
-          
+
           {apiData.duplicateGroups > 0 && (
             <div>
               <h4>Duplicate Items by Serial Number:</h4>
@@ -485,7 +485,7 @@ function DataInspector() {
                 <div key={group.key} className="duplicate-group">
                   <div className="duplicate-group-header">
                     <h5>Group {index + 1}: {group.key}</h5>
-                    <button 
+                    <button
                       className="small-button cleanup-button"
                       onClick={() => cleanupDuplicateGroup(group)}
                       disabled={loading}
@@ -529,7 +529,7 @@ function DataInspector() {
               ))}
             </div>
           )}
-          
+
           {apiData.deletedItems > 0 && (
             <div>
               <h4>Soft-Deleted Items:</h4>
@@ -557,18 +557,18 @@ function DataInspector() {
           )}
         </div>
       )}
-      
+
       {apiData && apiData.items && !apiData.items.duplicates && (
         <div className="inspector-results">
           <h3>Direct API Data</h3>
           <p>UIC: {apiData.uicID}</p>
           <p>Item count: {apiData.itemCount}</p>
-          
+
           {apiData.dynamoDBInfo && (
             <div className="dynamodb-info">
               <p>DynamoDB Table: {apiData.dynamoDBInfo.tableName}</p>
               <p>
-                <a 
+                <a
                   href={apiData.dynamoDBInfo.url}
                   target="_blank"
                   rel="noopener noreferrer"
@@ -579,7 +579,7 @@ function DataInspector() {
               </p>
             </div>
           )}
-          
+
           <pre className="data-preview">
             {JSON.stringify(apiData.items.slice(0, 5), null, 2)}
             {apiData.items.length > 5 && `\n... and ${apiData.items.length - 5} more items`}
@@ -590,4 +590,4 @@ function DataInspector() {
   );
 }
 
-export default DataInspector; 
+export default DataInspector;

@@ -18,12 +18,14 @@ function EquipmentMasterModal({ onClose }) {
   const [uploadedImage, setUploadedImage] = useState(null);
   const [oldImageKey, setOldImageKey] = useState(null);
   const [validationErrors, setValidationErrors] = useState({});
-  
+
   const fileInputRef = useRef(null);
   const client = generateClient();
 
   useEffect(() => {
     fetchEquipmentMasters();
+    // Load catalog once when the modal opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /**
@@ -34,7 +36,7 @@ function EquipmentMasterModal({ onClose }) {
       setLoading(true);
       setError('');
       setSuccess('');
-      
+
       const response = await client.graphql({
         query: `query ListEquipmentMasters {
           listEquipmentMasters(limit: 1000) {
@@ -59,10 +61,10 @@ function EquipmentMasterModal({ onClose }) {
           }
         }`
       });
-      
+
       // Filter out deleted items
       const items = response.data.listEquipmentMasters.items.filter(item => !item._deleted);
-      
+
       // Add signed URLs for image keys
       const itemsWithUrls = await Promise.all(items.map(async (item) => {
         if (item.imageKey) {
@@ -81,7 +83,7 @@ function EquipmentMasterModal({ onClose }) {
         }
         return item;
       }));
-      
+
       setEquipmentMasters(itemsWithUrls);
     } catch (error) {
       console.error('Error fetching equipment masters:', error);
@@ -115,11 +117,11 @@ function EquipmentMasterModal({ onClose }) {
         item.description?.toLowerCase().includes(searchLower)
       );
     });
-    
+
     return filtered.sort((a, b) => {
       let aValue = a[sortBy];
       let bValue = b[sortBy];
-      
+
       // Handle boolean values
       if (typeof aValue === 'boolean') {
         aValue = aValue ? 1 : 0;
@@ -129,7 +131,7 @@ function EquipmentMasterModal({ onClose }) {
         aValue = aValue || '';
         bValue = bValue || '';
       }
-      
+
       // Sort based on direction
       if (sortDirection === 'asc') {
         return aValue > bValue ? 1 : -1;
@@ -182,7 +184,7 @@ function EquipmentMasterModal({ onClose }) {
   const uploadImage = async (file) => {
     try {
       const fileName = `equipment-master/${Date.now()}-${file.name}`;
-      
+
       await uploadData({
         key: fileName,
         data: file,
@@ -190,7 +192,7 @@ function EquipmentMasterModal({ onClose }) {
           contentType: file.type
         }
       });
-      
+
       return fileName;
     } catch (error) {
       console.error('Error uploading image:', error);
@@ -216,15 +218,15 @@ function EquipmentMasterModal({ onClose }) {
    */
   const validateForm = () => {
     const errors = {};
-    
+
     if (!editItem.nsn || editItem.nsn.trim() === '') {
       errors.nsn = 'NSN is required';
     }
-    
+
     if (!editItem.commonName || editItem.commonName.trim() === '') {
       errors.commonName = 'Name is required';
     }
-    
+
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -236,18 +238,18 @@ function EquipmentMasterModal({ onClose }) {
     if (!validateForm()) {
       return;
     }
-    
+
     try {
       setLoading(true);
       setError('');
-      
+
       // Handle image upload if there's a new image
       let imageKey = editItem.imageKey;
-      
+
       if (uploadedImage) {
         // Upload the new image
         imageKey = await uploadImage(uploadedImage);
-        
+
         // Delete the old image if it exists
         if (oldImageKey) {
           await deleteImage(oldImageKey);
@@ -256,7 +258,7 @@ function EquipmentMasterModal({ onClose }) {
         // If imageKey was set to null but there was an old image, delete it
         await deleteImage(oldImageKey);
       }
-      
+
       // Prepare input for update
       const updateInput = {
         id: editItem.id,
@@ -275,7 +277,7 @@ function EquipmentMasterModal({ onClose }) {
         subComponents: editItem.subComponents || [],
         _version: editItem._version
       };
-      
+
       // Update the equipment master
       await client.graphql({
         query: updateEquipmentMaster,
@@ -283,10 +285,10 @@ function EquipmentMasterModal({ onClose }) {
           input: updateInput
         }
       });
-      
+
       setSuccess(`Equipment "${editItem.commonName}" updated successfully.`);
       setEditItem(null);
-      
+
       // Refresh data
       await fetchEquipmentMasters();
     } catch (error) {
@@ -304,17 +306,17 @@ function EquipmentMasterModal({ onClose }) {
     if (!validateForm()) {
       return;
     }
-    
+
     try {
       setLoading(true);
       setError('');
-      
+
       // Handle image upload if there's an image
       let imageKey = null;
       if (uploadedImage) {
         imageKey = await uploadImage(uploadedImage);
       }
-      
+
       // Prepare input for create
       const createInput = {
         nsn: editItem.nsn,
@@ -331,7 +333,7 @@ function EquipmentMasterModal({ onClose }) {
         imageKey: imageKey,
         subComponents: editItem.subComponents || []
       };
-      
+
       // Create the equipment master
       await client.graphql({
         query: createEquipmentMaster,
@@ -339,11 +341,11 @@ function EquipmentMasterModal({ onClose }) {
           input: createInput
         }
       });
-      
+
       setSuccess(`Equipment "${editItem.commonName}" created successfully.`);
       setEditItem(null);
       setShowAddForm(false);
-      
+
       // Refresh data
       await fetchEquipmentMasters();
     } catch (error) {
@@ -361,12 +363,12 @@ function EquipmentMasterModal({ onClose }) {
     try {
       setLoading(true);
       setError('');
-      
+
       // If the item has an image, delete it from S3
       if (item.imageKey) {
         await deleteImage(item.imageKey);
       }
-      
+
       // Delete the equipment master
       await client.graphql({
         query: deleteEquipmentMaster,
@@ -377,10 +379,10 @@ function EquipmentMasterModal({ onClose }) {
           }
         }
       });
-      
+
       setSuccess(`Equipment "${item.commonName}" deleted successfully.`);
       setConfirmDelete(null);
-      
+
       // Refresh data
       await fetchEquipmentMasters();
     } catch (error) {
@@ -427,10 +429,10 @@ function EquipmentMasterModal({ onClose }) {
         <h2>{!editItem ? 'Equipment Catalog' : (showAddForm ? 'Add New Equipment' : 'Edit Equipment')}</h2>
         <button className="close-button" onClick={onClose}>&times;</button>
       </div>
-      
+
       {error && <div className="error-message">{error}</div>}
       {success && <div className="success-message">{success}</div>}
-      
+
       {confirmDelete && (
         <div className="delete-confirmation-modal">
           <div className="delete-confirmation-content">
@@ -438,14 +440,14 @@ function EquipmentMasterModal({ onClose }) {
             <p>Are you sure you want to delete <strong>{confirmDelete.commonName}</strong>?</p>
             <p className="warning">This action cannot be undone. All associated equipment items will be orphaned.</p>
             <div className="confirmation-actions">
-              <button 
+              <button
                 className="secondary-button"
                 onClick={() => setConfirmDelete(null)}
                 disabled={loading}
               >
                 Cancel
               </button>
-              <button 
+              <button
                 className="danger-button"
                 onClick={() => handleDeleteItem(confirmDelete)}
                 disabled={loading}
@@ -456,7 +458,7 @@ function EquipmentMasterModal({ onClose }) {
           </div>
         </div>
       )}
-      
+
       {!editItem ? (
         // List View
         <>
@@ -470,20 +472,20 @@ function EquipmentMasterModal({ onClose }) {
                 className="search-input"
               />
             </div>
-            
-            <button 
+
+            <button
               className="primary-button"
               onClick={handleShowAddForm}
             >
               Add New Equipment
             </button>
           </div>
-          
+
           {loading ? (
             <div className="loading">Loading equipment catalog...</div>
           ) : sortedMasters().length === 0 ? (
             <div className="no-data">
-              No equipment types found. 
+              No equipment types found.
               {searchTerm ? ' Try a different search term or ' : ' '}
               create a new type using the button above.
             </div>
@@ -515,10 +517,10 @@ function EquipmentMasterModal({ onClose }) {
                       <td>{item.commonName}</td>
                       <td className="thumbnail-cell">
                         {item.imageUrl && (
-                          <img 
-                            src={item.imageUrl} 
-                            alt={item.commonName} 
-                            className="item-thumbnail" 
+                          <img
+                            src={item.imageUrl}
+                            alt={item.commonName}
+                            className="item-thumbnail"
                           />
                         )}
                       </td>
@@ -549,7 +551,7 @@ function EquipmentMasterModal({ onClose }) {
         // Edit/Add View
         <div className="equipment-master-edit">
           <h3>{showAddForm ? 'Add New Equipment' : 'Edit Equipment Details'}</h3>
-          
+
           <div className="edit-form-container">
             <div className="edit-form-main">
               <div className="form-row">
@@ -566,7 +568,7 @@ function EquipmentMasterModal({ onClose }) {
                   />
                   {validationErrors.nsn && <div className="error">{validationErrors.nsn}</div>}
                 </div>
-                
+
                 <div className="form-group">
                   <label htmlFor="commonName">Common Name*</label>
                   <input
@@ -580,7 +582,7 @@ function EquipmentMasterModal({ onClose }) {
                   {validationErrors.commonName && <div className="error">{validationErrors.commonName}</div>}
                 </div>
               </div>
-              
+
               <div className="form-group">
                 <label htmlFor="description">Description</label>
                 <textarea
@@ -591,7 +593,7 @@ function EquipmentMasterModal({ onClose }) {
                   rows="3"
                 />
               </div>
-              
+
               <div className="form-row">
                 <div className="form-group">
                   <label htmlFor="tmNumber">TM Number</label>
@@ -603,7 +605,7 @@ function EquipmentMasterModal({ onClose }) {
                     onChange={handleInputChange}
                   />
                 </div>
-                
+
                 <div className="form-group">
                   <label htmlFor="maintenanceSchedule">Maintenance Schedule</label>
                   <input
@@ -615,7 +617,7 @@ function EquipmentMasterModal({ onClose }) {
                   />
                 </div>
               </div>
-              
+
               <div className="form-group">
                 <label htmlFor="storageRestrictions">Storage Restrictions</label>
                 <textarea
@@ -626,7 +628,7 @@ function EquipmentMasterModal({ onClose }) {
                   rows="2"
                 />
               </div>
-              
+
               <div className="form-row">
                 <div className="form-group checkbox">
                   <input
@@ -638,7 +640,7 @@ function EquipmentMasterModal({ onClose }) {
                   />
                   <label htmlFor="isSerialTracked">Serial Number Tracked</label>
                 </div>
-                
+
                 <div className="form-group checkbox">
                   <input
                     type="checkbox"
@@ -650,7 +652,7 @@ function EquipmentMasterModal({ onClose }) {
                   <label htmlFor="isSensitiveItem">Sensitive Item</label>
                 </div>
               </div>
-              
+
               <div className="form-row">
                 <div className="form-group checkbox">
                   <input
@@ -662,7 +664,7 @@ function EquipmentMasterModal({ onClose }) {
                   />
                   <label htmlFor="isConsumable">Consumable Item</label>
                 </div>
-                
+
                 <div className="form-group checkbox">
                   <input
                     type="checkbox"
@@ -674,7 +676,7 @@ function EquipmentMasterModal({ onClose }) {
                   <label htmlFor="isCyclicInventory">Cyclic Inventory Required</label>
                 </div>
               </div>
-              
+
               <div className="form-row">
                 <div className="form-group checkbox">
                   <input
@@ -688,33 +690,33 @@ function EquipmentMasterModal({ onClose }) {
                 </div>
               </div>
             </div>
-            
+
             <div className="edit-form-image">
               <label>Equipment Image</label>
-              <div 
+              <div
                 className={`image-upload-area ${(uploadedImage || editItem.imageUrl) ? 'has-image' : ''}`}
                 onClick={handleImageClick}
               >
-                <input 
-                  type="file" 
-                  ref={fileInputRef} 
-                  onChange={handleFileSelect} 
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileSelect}
                   style={{ display: 'none' }}
                   accept="image/*"
                 />
-                
+
                 {uploadedImage ? (
                   <div className="image-preview-container">
-                    <img 
-                      src={URL.createObjectURL(uploadedImage)} 
-                      alt="Preview" 
-                      className="image-preview" 
+                    <img
+                      src={URL.createObjectURL(uploadedImage)}
+                      alt="Preview"
+                      className="image-preview"
                     />
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       className="remove-image-button"
-                      onClick={(e) => { 
-                        e.stopPropagation(); 
+                      onClick={(e) => {
+                        e.stopPropagation();
                         handleRemoveImage();
                       }}
                     >
@@ -723,16 +725,16 @@ function EquipmentMasterModal({ onClose }) {
                   </div>
                 ) : editItem.imageUrl ? (
                   <div className="image-preview-container">
-                    <img 
-                      src={editItem.imageUrl} 
-                      alt={editItem.commonName} 
-                      className="image-preview" 
+                    <img
+                      src={editItem.imageUrl}
+                      alt={editItem.commonName}
+                      className="image-preview"
                     />
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       className="remove-image-button"
-                      onClick={(e) => { 
-                        e.stopPropagation(); 
+                      onClick={(e) => {
+                        e.stopPropagation();
                         handleRemoveImage();
                       }}
                     >
@@ -749,9 +751,9 @@ function EquipmentMasterModal({ onClose }) {
               </div>
             </div>
           </div>
-          
+
           <div className="modal-actions">
-            <button 
+            <button
               className="secondary-button"
               onClick={() => {
                 setEditItem(null);
@@ -761,7 +763,7 @@ function EquipmentMasterModal({ onClose }) {
             >
               Cancel
             </button>
-            <button 
+            <button
               className="primary-button"
               onClick={showAddForm ? handleAddItem : handleSaveEdit}
               disabled={loading}

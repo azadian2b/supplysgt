@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { generateClient } from 'aws-amplify/api';
 import { getCurrentUser } from 'aws-amplify/auth';
-import { createEquipmentMaster, createEquipmentItem, updateUIC, updateUser } from '../../graphql/mutations';
+import { createEquipmentMaster, createEquipmentItem, updateUser } from '../../graphql/mutations';
 import { listUICS } from '../../graphql/queries';
 import { useNavigate } from 'react-router-dom';
 import './Equipment.css';
@@ -24,6 +24,8 @@ function AddEquipmentModal({ onClose }) {
     if (showUICError) {
       fetchAvailableUICs();
     }
+    // Fetch only when the UIC recovery panel is shown.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showUICError]);
 
   const fetchAvailableUICs = async () => {
@@ -32,13 +34,13 @@ function AddEquipmentModal({ onClose }) {
       const result = await client.graphql({
         query: listUICS
       });
-      
+
       // Filter to only include UICs with valid uicCodes
       const uics = result.data.listUICS.items.filter(uic => uic.uicCode && !uic._deleted);
       console.log('Available UICs:', uics);
-      
+
       setAvailableUICs(uics);
-      
+
       // If there are valid UICs, pre-select the first one
       if (uics.length > 0) {
         setSelectedUIC(uics[0].id);
@@ -53,13 +55,13 @@ function AddEquipmentModal({ onClose }) {
   const handleUICSelect = (e) => {
     setSelectedUIC(e.target.value);
   };
-  
+
   const handleAssignUIC = async () => {
     if (!selectedUIC || !currentUser) return;
-    
+
     try {
       setLoading(true);
-      
+
       // Update the user's UIC
       await client.graphql({
         query: updateUser,
@@ -71,12 +73,12 @@ function AddEquipmentModal({ onClose }) {
           }
         }
       });
-      
+
       // Success! Close the error UI and try again
       setShowUICError(false);
       setError('');
       setSuccess('UIC assigned successfully. You can now add equipment.');
-      
+
       // Optionally reload the page or reset the component state
       setTimeout(() => {
         window.location.reload();
@@ -100,7 +102,7 @@ function AddEquipmentModal({ onClose }) {
   const parseCSVData = (data) => {
     // Split by newlines and filter out empty rows
     const rows = data.split('\n').filter(row => row.trim() !== '');
-    
+
     // Map each row into an object
     return rows.map(row => {
       const [lin, nsn, serialNumber, stockNumber, location] = row.split('\t');
@@ -136,7 +138,7 @@ function AddEquipmentModal({ onClose }) {
 
       // Parse the CSV data
       const equipmentItems = parseCSVData(bulkData);
-      
+
       // Validate data
       const validationErrors = validateEquipmentData(equipmentItems);
       if (validationErrors.length > 0) {
@@ -148,7 +150,7 @@ function AddEquipmentModal({ onClose }) {
       // Get current user and their UIC
       const { username } = await getCurrentUser();
       console.log('Current authenticated username:', username);
-      
+
       try {
         // First try to get the user directly by their username/owner field
         const userAttributes = await client.graphql({
@@ -171,21 +173,21 @@ function AddEquipmentModal({ onClose }) {
           }`,
           variables: { owner: username }
         });
-        
+
         console.log('Raw usersByOwner response:', JSON.stringify(userAttributes.data.usersByOwner, null, 2));
-        
+
         // Filter out null items and ensure valid user records
-        let validUserRecords = userAttributes.data.usersByOwner.items.filter(item => 
+        let validUserRecords = userAttributes.data.usersByOwner.items.filter(item =>
           item !== null && item.firstName && item.lastName && !item._deleted
         );
-        
+
         // Sort by createdAt to get the most recent one
-        validUserRecords = validUserRecords.sort((a, b) => 
+        validUserRecords = validUserRecords.sort((a, b) =>
           new Date(b.createdAt) - new Date(a.createdAt)
         );
-        
+
         console.log('Valid user records for this username:', validUserRecords);
-        
+
         if (validUserRecords.length === 0) {
           // Fallback - try searching for the user by listing all users (if permissions allow)
           try {
@@ -207,13 +209,13 @@ function AddEquipmentModal({ onClose }) {
                 }
               }`
             });
-            
+
             console.log("All matching users:", JSON.stringify(allUsersResult.data.listUsers.items, null, 2));
-            
-            validUserRecords = allUsersResult.data.listUsers.items.filter(item => 
+
+            validUserRecords = allUsersResult.data.listUsers.items.filter(item =>
               item !== null && item.firstName && item.lastName && !item._deleted
             );
-            
+
             if (validUserRecords.length === 0) {
               setError('No valid user profile found. Please complete your profile setup first.');
               setLoading(false);
@@ -226,20 +228,20 @@ function AddEquipmentModal({ onClose }) {
             return;
           }
         }
-        
+
         // Get the most recently created user record
         const userData = validUserRecords[0];
         console.log('Using user data:', userData);
-        
+
         // Store the user data for UIC assignment if needed
         setCurrentUser(userData);
-        
+
         if (!userData || !userData.uicID) {
           setError('You must be assigned to a UIC to add equipment.');
           setLoading(false);
           return;
         }
-        
+
         // Fetch UIC directly to ensure we have complete and correct data
         let uicData = null;
         try {
@@ -255,10 +257,10 @@ function AddEquipmentModal({ onClose }) {
             }`,
             variables: { id: userData.uicID }
           });
-          
+
           uicData = uicResult.data.getUIC;
           console.log('UIC data:', JSON.stringify(uicData, null, 2));
-          
+
           // Check if UIC is deleted
           if (uicData && uicData._deleted) {
             console.warn('UIC record is marked as deleted');
@@ -268,23 +270,23 @@ function AddEquipmentModal({ onClose }) {
           }
         } catch (uicFetchError) {
           console.error('Error fetching UIC data:', uicFetchError);
-          
+
           // Show UIC error UI instead of just a message
           setShowUICError(true);
           setLoading(false);
           return;
         }
-        
+
         // If UIC data has no uicCode, provide guidance
         if (!uicData || !uicData.uicCode) {
           console.warn('UIC missing uicCode:', uicData);
-          
+
           // Show UIC error UI instead of just a message
           setShowUICError(true);
           setLoading(false);
           return;
         }
-        
+
         // Process each equipment item
         const results = [];
         for (const item of equipmentItems) {
@@ -303,7 +305,7 @@ function AddEquipmentModal({ onClose }) {
               }`,
               variables: { nsn: item.nsn }
             });
-            
+
             const equipmentMasters = equipmentMasterResult.data.equipmentMasterByNSN.items;
             if (equipmentMasters && equipmentMasters.length > 0) {
               equipmentMasterId = equipmentMasters[0].id;
@@ -352,7 +354,7 @@ function AddEquipmentModal({ onClose }) {
                 }
               }
             });
-            
+
             results.push(equipmentItemResult.data.createEquipmentItem);
           } catch (error) {
             console.error('Error creating equipment item:', error);
@@ -389,15 +391,15 @@ function AddEquipmentModal({ onClose }) {
               Your UIC (Unit Identification Code) record is missing required data that prevents
               you from adding equipment to your inventory.
             </p>
-            
+
             {availableUICs.length > 0 ? (
               <div className="uic-selection">
                 <h3>Option 1: Select an existing UIC</h3>
                 <p>The following UICs have valid data. You can assign one to your profile:</p>
-                
+
                 <div className="form-group">
-                  <select 
-                    value={selectedUIC} 
+                  <select
+                    value={selectedUIC}
                     onChange={handleUICSelect}
                     disabled={loading || loadingUICs}
                     className="uic-select"
@@ -409,15 +411,15 @@ function AddEquipmentModal({ onClose }) {
                     ))}
                   </select>
                 </div>
-                
-                <button 
-                  className="primary-button" 
+
+                <button
+                  className="primary-button"
                   onClick={handleAssignUIC}
                   disabled={loading || !selectedUIC}
                 >
                   {loading ? 'Assigning...' : 'Assign Selected UIC to My Profile'}
                 </button>
-                
+
                 <div className="option-separator">
                   <span>OR</span>
                 </div>
@@ -427,7 +429,7 @@ function AddEquipmentModal({ onClose }) {
             ) : (
               <p>No existing valid UICs were found in the system.</p>
             )}
-            
+
             <div className="uic-error-steps">
               <h3>{availableUICs.length > 0 ? 'Option 2: ' : ''}Create a new UIC</h3>
               <ol>
@@ -439,7 +441,7 @@ function AddEquipmentModal({ onClose }) {
                 <li>Return to this screen and try adding equipment again</li>
               </ol>
             </div>
-            
+
             <div className="modal-actions">
               <button className="secondary-button" onClick={onClose}>
                 Cancel
@@ -457,7 +459,7 @@ function AddEquipmentModal({ onClose }) {
               <br />
               LIN (required), NSN (required), Serial Number, Stock Number, Location
             </p>
-            
+
             <textarea
               className="bulk-input"
               placeholder="Paste tab-delimited data here..."
@@ -470,13 +472,13 @@ function AddEquipmentModal({ onClose }) {
             {success && <div className="success-message">{success}</div>}
 
             <div className="modal-actions">
-              <button 
+              <button
                 className="secondary-button"
                 onClick={onClose}
               >
                 Cancel
               </button>
-              <button 
+              <button
                 className="primary-button"
                 onClick={handleAddEquipment}
                 disabled={loading || !bulkData.trim()}
@@ -491,4 +493,4 @@ function AddEquipmentModal({ onClose }) {
   );
 }
 
-export default AddEquipmentModal; 
+export default AddEquipmentModal;

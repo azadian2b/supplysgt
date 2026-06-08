@@ -1,4 +1,4 @@
-type UIC @model 
+type UIC @model
 @auth(rules: [
   { allow: private },
   { allow: owner, operations: [read] }
@@ -13,9 +13,11 @@ type UIC @model
   equipmentGroups: [EquipmentGroup] @hasMany(indexName: "byUIC", fields: ["id"])
   handReceiptStatuses: [HandReceiptStatus] @hasMany(indexName: "byFromUIC", fields: ["id"])
   accountabilitySessions: [AccountabilitySession] @hasMany(indexName: "byUIC", fields: ["id"])
+  # Add relationship for additional UICs
+  additionalUICs: [AdditionalUIC] @hasMany(indexName: "byUIC", fields: ["id"])
 }
 
-type User @model 
+type User @model
 @auth(rules: [
   { allow: owner },
   { allow: private, operations: [read] }
@@ -30,27 +32,52 @@ type User @model
   uic: UIC @belongsTo(fields: ["uicID"])
   # Add this field to establish the relationship with UICMembershipRequest
   membershipRequests: [UICMembershipRequest] @hasMany(indexName: "byUser", fields: ["id"])
+  # Add relationship for UICCreationRequest
+  uicCreationRequests: [UICCreationRequest] @hasMany(indexName: "byUser", fields: ["id"])
   # To avoid circular dependency, we'll just store the ID without @belongsTo
   linkedSoldierId: ID
   # Add a field to let us look up Users from Soldiers
   soldiersLinked: [Soldier] @hasMany(indexName: "byUser", fields: ["id"])
   conductedSessions: [AccountabilitySession] @hasMany(indexName: "byConductedBy", fields: ["id"])
   verifiedItems: [AccountabilityItem] @hasMany(indexName: "byVerifiedBy", fields: ["id"])
+  # Add field for additional UICs that supply sergeants can work with
+  additionalUICs: [AdditionalUIC] @hasMany(indexName: "byUser", fields: ["id"])
 }
 
-type UICMembershipRequest @model 
+type UICMembershipRequest @model
 @auth(rules: [
   { allow: owner, ownerField: "userID" },
   { allow: private }
 ]) {
   id: ID!
-  userID: ID! @index(name: "byUser") # Add index for the relationship
+  userID: ID! @index(name: "byUser")
   uicID: ID! @index(name: "byUIC")
   user: User @belongsTo(fields: ["userID"])
   uic: UIC @belongsTo(fields: ["uicID"])
   requestedRole: Role!
   status: RequestStatus!
   createdAt: AWSDateTime!
+  approvedBy: ID
+  approvedAt: AWSDateTime
+  rejectionReason: String
+}
+
+type UICCreationRequest @model
+@auth(rules: [
+  { allow: owner, ownerField: "requestedBy" },
+  { allow: private }
+]) {
+  id: ID!
+  requestedBy: ID! @index(name: "byUser")
+  user: User @belongsTo(fields: ["requestedBy"])
+  uicCode: String!
+  uicName: String!
+  status: RequestStatus!
+  createdAt: AWSDateTime!
+  approvedBy: ID
+  approvedAt: AWSDateTime
+  rejectionReason: String
+  createdUIC: ID
 }
 
 # New Soldier model for tracking all soldiers in a UIC
@@ -120,7 +147,7 @@ type EquipmentItem @model
   { allow: private }
 ]) {
   id: ID!
-  uicID: ID! @index(name: "byUIC") 
+  uicID: ID! @index(name: "byUIC")
   uic: UIC @belongsTo(fields: ["uicID"])
   equipmentMasterID: ID! @index(name: "byEquipmentMaster")
   equipmentMaster: EquipmentMaster @belongsTo(fields: ["equipmentMasterID"])
@@ -255,4 +282,20 @@ enum MaintenanceStatus {
   IN_MAINTENANCE
   DEADLINED
   MISSING
-} 
+}
+
+# New model for tracking additional UICs that supply sergeants can work with
+type AdditionalUIC @model
+@auth(rules: [
+  { allow: owner, ownerField: "userID" },
+  { allow: private }
+]) {
+  id: ID!
+  userID: ID! @index(name: "byUser")
+  uicID: ID! @index(name: "byUIC")
+  user: User @belongsTo(fields: ["userID"])
+  uic: UIC @belongsTo(fields: ["uicID"])
+  status: RequestStatus!
+  createdAt: AWSDateTime!
+  updatedAt: AWSDateTime!
+}

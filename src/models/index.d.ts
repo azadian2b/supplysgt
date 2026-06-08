@@ -70,6 +70,7 @@ type EagerUIC = {
   readonly equipmentGroups?: (EquipmentGroup | null)[] | null;
   readonly handReceiptStatuses?: (HandReceiptStatus | null)[] | null;
   readonly accountabilitySessions?: (AccountabilitySession | null)[] | null;
+  readonly additionalUICs?: (AdditionalUIC | null)[] | null;
   readonly createdAt?: string | null;
   readonly updatedAt?: string | null;
 }
@@ -89,6 +90,7 @@ type LazyUIC = {
   readonly equipmentGroups: AsyncCollection<EquipmentGroup>;
   readonly handReceiptStatuses: AsyncCollection<HandReceiptStatus>;
   readonly accountabilitySessions: AsyncCollection<AccountabilitySession>;
+  readonly additionalUICs: AsyncCollection<AdditionalUIC>;
   readonly createdAt?: string | null;
   readonly updatedAt?: string | null;
 }
@@ -117,6 +119,7 @@ type EagerUser = {
   readonly soldiersLinked?: (Soldier | null)[] | null;
   readonly conductedSessions?: (AccountabilitySession | null)[] | null;
   readonly verifiedItems?: (AccountabilityItem | null)[] | null;
+  readonly additionalUICs?: (AdditionalUIC | null)[] | null;
   readonly createdAt?: string | null;
   readonly updatedAt?: string | null;
 }
@@ -139,6 +142,7 @@ type LazyUser = {
   readonly soldiersLinked: AsyncCollection<Soldier>;
   readonly conductedSessions: AsyncCollection<AccountabilitySession>;
   readonly verifiedItems: AsyncCollection<AccountabilityItem>;
+  readonly additionalUICs: AsyncCollection<AdditionalUIC>;
   readonly createdAt?: string | null;
   readonly updatedAt?: string | null;
 }
@@ -525,4 +529,38 @@ export declare type AccountabilityItem = LazyLoading extends LazyLoadingDisabled
 
 export declare const AccountabilityItem: (new (init: ModelInit<AccountabilityItem>) => AccountabilityItem) & {
   copyOf(source: AccountabilityItem, mutator: (draft: MutableModel<AccountabilityItem>) => MutableModel<AccountabilityItem> | void): AccountabilityItem;
+}
+
+type EagerAdditionalUIC = {
+  readonly [__modelMeta__]: {
+    identifier: ManagedIdentifier<AdditionalUIC, 'id'>;
+  };
+  readonly id: string;
+  readonly userID: string;
+  readonly uicID: string;
+  readonly user?: User | null;
+  readonly uic?: UIC | null;
+  readonly status: RequestStatus | keyof typeof RequestStatus;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+type LazyAdditionalUIC = {
+  readonly [__modelMeta__]: {
+    identifier: ManagedIdentifier<AdditionalUIC, 'id'>;
+  };
+  readonly id: string;
+  readonly userID: string;
+  readonly uicID: string;
+  readonly user: AsyncItem<User | undefined>;
+  readonly uic: AsyncItem<UIC | undefined>;
+  readonly status: RequestStatus | keyof typeof RequestStatus;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+export declare type AdditionalUIC = LazyLoading extends LazyLoadingDisabled ? EagerAdditionalUIC : LazyAdditionalUIC
+
+export declare const AdditionalUIC: (new (init: ModelInit<AdditionalUIC>) => AdditionalUIC) & {
+  copyOf(source: AdditionalUIC, mutator: (draft: MutableModel<AdditionalUIC>) => MutableModel<AdditionalUIC> | void): AdditionalUIC;
 }

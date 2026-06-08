@@ -1,5 +1,5 @@
 import { DataStore } from '@aws-amplify/datastore';
-import { User, UIC } from '../models';
+import { User } from '../models';
 import { Hub } from 'aws-amplify/utils';
 
 // Track DataStore state to prevent concurrent operations
@@ -7,10 +7,10 @@ let isInitialized = false;
 let isSyncing = false;
 let isClearing = false;
 
-// Initialize the DataStore once at startup
+// Initialize DataStore after an authenticated session is available.
 export const initializeDataStore = async () => {
   if (isInitialized) return;
-  
+
   try {
     console.log("Initializing DataStore...");
     isInitialized = true;
@@ -38,16 +38,16 @@ export const syncUserData = async (username) => {
   try {
     isSyncing = true;
     console.log("Syncing user data for:", username);
-    
+
     // Make sure DataStore is started
     if (!isInitialized) {
       await initializeDataStore();
     }
-    
+
     // Force a sync of the User model
     const existingUsers = await DataStore.query(User, u => u.owner.eq(username));
     console.log("Fetched user data:", existingUsers);
-    
+
     isSyncing = false;
     return existingUsers.length > 0 ? existingUsers[0] : null;
   } catch (error) {
@@ -58,36 +58,45 @@ export const syncUserData = async (username) => {
 };
 
 // Safe version of DataStore clear that manages state
-export const safeDataStoreClear = async () => {
+export const safeDataStoreClear = async ({ restart = true } = {}) => {
   if (isClearing) {
     console.log("DataStore clear already in progress");
     return;
   }
-  
+
   try {
     isClearing = true;
     console.log("Clearing DataStore...");
-    
+
     // Stop DataStore before clearing
     await DataStore.stop();
     await DataStore.clear();
-    
-    // Restart DataStore
-    await DataStore.start();
-    
-    console.log("DataStore cleared and restarted");
+
+    if (restart) {
+      await DataStore.start();
+      isInitialized = true;
+    } else {
+      isInitialized = false;
+    }
+
+    console.log(restart ? "DataStore cleared and restarted" : "DataStore cleared");
     isClearing = false;
   } catch (error) {
     console.error("Error clearing DataStore:", error);
     isClearing = false;
-    
-    // Try to recover by restarting DataStore
-    try {
-      await DataStore.start();
-    } catch (startError) {
-      console.error("Failed to restart DataStore after clear error:", startError);
+
+    if (restart) {
+      try {
+        await DataStore.start();
+        isInitialized = true;
+      } catch (startError) {
+        isInitialized = false;
+        console.error("Failed to restart DataStore after clear error:", startError);
+      }
+    } else {
+      isInitialized = false;
     }
-    
+
     throw error;
   }
 };
@@ -97,31 +106,31 @@ export const setupAuthListener = () => {
   Hub.listen('auth', async (data) => {
     const { payload } = data;
     console.log("Auth event:", payload.event);
-    
+
     if (payload.event === 'signIn') {
       // Wait a moment for auth to complete
       setTimeout(async () => {
         try {
           // Clear local data and force a refresh from the server
-          await safeDataStoreClear();
+          await safeDataStoreClear({ restart: true });
           console.log("DataStore cleared after sign-in");
         } catch (error) {
           console.error("Error handling sign-in data sync:", error);
         }
       }, 1000);
     }
-    
+
     if (payload.event === 'signOut') {
       // Clear local data on sign out
       try {
-        await safeDataStoreClear();
+        await safeDataStoreClear({ restart: false });
         console.log("DataStore cleared after sign-out");
       } catch (error) {
         console.error("Error clearing data on sign-out:", error);
       }
     }
   });
-  
+
   console.log("Auth listener set up");
 };
 
@@ -144,27 +153,29 @@ export const safeDataStoreSave = async (modelOrInstance, callback = null) => {
     if (!isInitialized) {
       await initializeDataStore();
     }
-    
+
     if (callback) {
-      // For copyOf pattern: modelOrInstance is a model instance, callback is the updater function
-      return await DataStore.save(modelOrInstance, callback);
+      if (!modelOrInstance?.constructor?.copyOf) {
+        throw new Error('safeDataStoreSave update requires a DataStore model instance');
+      }
+      return await DataStore.save(modelOrInstance.constructor.copyOf(modelOrInstance, callback));
     } else {
       // For new instance: modelOrInstance is the instance to save
       return await DataStore.save(modelOrInstance);
     }
   } catch (error) {
     console.error(`Error saving to DataStore:`, error);
-    
+
     // If we hit a DataStore error, try to recover
     if (error.name === 'DataStoreStateError') {
       console.log('Attempting to recover from DataStore state error...');
       await recoverDataStoreState();
       // Try the save operation again
-      return callback ? 
-        await DataStore.save(modelOrInstance, callback) :
-        await DataStore.save(modelOrInstance);
+      return callback
+        ? await DataStore.save(modelOrInstance.constructor.copyOf(modelOrInstance, callback))
+        : await DataStore.save(modelOrInstance);
     }
-    
+
     throw error;
   }
 };
@@ -175,10 +186,10 @@ async function recoverDataStoreState() {
     // Check if DataStore needs to be started
     await DataStore.stop();
     console.log('DataStore stopped for recovery');
-    
+
     // Wait a moment
     await new Promise(resolve => setTimeout(resolve, 500));
-    
+
     // Restart
     await DataStore.start();
     console.log('DataStore restarted after recovery');
@@ -187,4 +198,4 @@ async function recoverDataStoreState() {
     console.error('Failed to recover DataStore state:', error);
     throw error;
   }
-}; 
+};
