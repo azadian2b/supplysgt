@@ -14,6 +14,7 @@
 - The existing live backend environment is named `dev` and currently backs `supplysgt.net`.
 - The current Gen 1 app uses manual hosting, so Gen 2 branch deployment should use a new Git-connected Amplify app.
 - `develop` was created from commit `70e94f1c422c72f375fe21a4b14d4fc88765f5a4`, which contains the offline custody migration prep and DataStore removal work.
+- The checked-in `amplify.yml` is the Gen 1 production/fullstack build spec. Replace it with the migration-generated Gen 2 `ampx pipeline-deploy` build spec on the generated Gen 2 branch.
 
 ## Rollout Sequence
 
