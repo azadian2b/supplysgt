@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { DataStore, SortDirection } from '@aws-amplify/datastore';
+import { DataStore, SortDirection } from '../utils/GraphQLDataStoreCompat';
 import { getCurrentUser, fetchUserAttributes } from 'aws-amplify/auth';
 import { User, UIC, UICMembershipRequest, Role, RequestStatus, Soldier, AdditionalUIC, UICCreationRequest } from '../models';
 import { useNavigate } from 'react-router-dom';

@@ -1,23 +1,11 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import './configureAmplify';
 import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
-import { Amplify } from 'aws-amplify';
-import { DataStore } from '@aws-amplify/datastore';
-import awsconfig from './aws-exports';
 import { setupAuthListener } from './utils/DataSyncManager';
 import * as serviceWorkerRegistration from './serviceWorkerRegistration';
-
-// Configure Amplify
-Amplify.configure(awsconfig);
-
-// Initialize DataStore with all configurations in one call
-DataStore.configure({
-  errorHandler: error => {
-    console.log('DataStore error', error);
-  }
-});
 
 // Set up auth listener for sign-in/sign-out events
 setupAuthListener();

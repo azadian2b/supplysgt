@@ -1,18 +1,21 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { generateClient } from 'aws-amplify/api';
 import { getCurrentUser } from 'aws-amplify/auth';
-import { DataStore } from 'aws-amplify/datastore';
 import './Pages.css';
 import './Accountability.css';
 
 // Import custom hooks
 import useHandReceiptedEquipment from '../hooks/useHandReceiptedEquipment';
 
-// Import models for local storage
-import { AccountabilitySession, AccountabilityItem, EquipmentItem } from '../models';
-
-// Import DataStore utility
 import DataStoreUtil from '../utils/DataStoreSync';
+import { getConnectivityMode, getConnectivityModeSnapshot, subscribeConnectivityMode } from '../offline/connectivityMode';
+import {
+  getPendingCheckInEvents,
+  getUnitOfflineSnapshot,
+  loadCachedUnitOfflineSnapshot,
+  queueCheckInEvent,
+  submitPendingCheckIns
+} from '../offline/offlineCustodyRepository';
 
 // Import GraphQL queries and mutations
 import { accountabilityItemsBySessionID } from '../graphql/queries';
@@ -30,7 +33,7 @@ function Accountability() {
   const [uicID, setUicID] = useState(null);
   const [userID, setUserID] = useState(null);
   const [online, setOnline] = useState(navigator.onLine);
-  const [offlineMode, setOfflineMode] = useState(false);
+  const [offlineMode, setOfflineMode] = useState(getConnectivityModeSnapshot() === 'offline');
   const [pendingSyncs, setPendingSyncs] = useState(0);
 
   // Function selection state
@@ -90,15 +93,20 @@ function Accountability() {
       // Set up online/offline detection
       window.addEventListener('online', handleConnectionChange);
       window.addEventListener('offline', handleConnectionChange);
-
-      // Listen for connectivity mode changes from the Header
-      window.addEventListener('storage', handleStorageChange);
     }
+
+    const unsubscribeConnectivity = subscribeConnectivityMode(mode => {
+      setOfflineMode(mode === 'offline');
+      setOnline(navigator.onLine);
+      if (navigator.onLine && mode !== 'offline') {
+        checkForPendingSyncs();
+      }
+    });
 
     return () => {
       window.removeEventListener('online', handleConnectionChange);
       window.removeEventListener('offline', handleConnectionChange);
-      window.removeEventListener('storage', handleStorageChange);
+      unsubscribeConnectivity();
 
       // Clean up any active subscriptions
       if (subscriptionRef.current) {
@@ -109,25 +117,21 @@ function Accountability() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Listen for storage events (changes from ConnectivityToggle in Header)
-  const handleStorageChange = (event) => {
-    if (event.key === 'connectivityMode') {
-      const newMode = event.newValue;
-      setOfflineMode(newMode === 'offline');
-      setOnline(navigator.onLine);
-    }
-  };
-
   // Check current connectivity mode on component mount
   useEffect(() => {
-    // Get initial mode from localStorage (set by Header component)
-    const currentMode = localStorage.getItem('connectivityMode');
-    setOfflineMode(currentMode === 'offline');
+    let cancelled = false;
 
-    // Initial check for pending syncs
-    if (navigator.onLine && currentMode !== 'offline') {
-      checkForPendingSyncs();
-    }
+    getConnectivityMode().then(currentMode => {
+      if (cancelled) return;
+      setOfflineMode(currentMode === 'offline');
+      if (navigator.onLine && currentMode !== 'offline') {
+        checkForPendingSyncs();
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
     // Connectivity check is keyed to the active UIC context.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uicID]);
@@ -137,8 +141,7 @@ function Accountability() {
     const isOnline = navigator.onLine;
     setOnline(isOnline);
 
-    // Check for offline mode (as configured in the Header's toggle)
-    const currentOfflineMode = localStorage.getItem('connectivityMode') === 'offline';
+    const currentOfflineMode = getConnectivityModeSnapshot() === 'offline';
     setOfflineMode(currentOfflineMode);
 
     // Only check for syncs if we're online and not in offline mode
@@ -152,17 +155,8 @@ function Accountability() {
     try {
       if (!online || offlineMode) return;
 
-      // Get local models that need syncing
-      const localSessions = await DataStore.query(AccountabilitySession, session =>
-        session.syncStatus('notSynced')
-      );
-
-      const localItems = await DataStore.query(AccountabilityItem, item =>
-        item.syncStatus('notSynced')
-      );
-
-      const totalPending = localSessions.length + localItems.length;
-      setPendingSyncs(totalPending);
+      const pending = await getPendingCheckInEvents();
+      setPendingSyncs(uicID ? pending.filter(event => event.uicID === uicID).length : pending.length);
     } catch (error) {
       console.error('Error checking for pending syncs:', error);
     }
@@ -179,13 +173,13 @@ function Accountability() {
       setSuccess('');
       setError('');
 
-      // Use the DataStoreUtil to handle syncing
       await DataStoreUtil.setConnectivityMode(true);
+      const result = await submitPendingCheckIns();
 
       // Update counters
       await checkForPendingSyncs();
 
-      setSuccess('Data synchronized successfully.');
+      setSuccess(`Data synchronized. Submitted ${result.submitted} queued check-ins${result.failed ? `; ${result.failed} still need review.` : '.'}`);
 
       // Reload data from the server to get the latest
       if (uicID) {
@@ -235,12 +229,18 @@ function Accountability() {
       setUicID(userData.uicID);
       setUserID(userData.id);
 
-      // Get the current connectivity mode
-      const currentMode = localStorage.getItem('connectivityMode');
+      const currentMode = getConnectivityModeSnapshot();
       setOfflineMode(currentMode === 'offline');
 
       // Load active accountability sessions after getting UIC ID
       if (userData.uicID) {
+        if (navigator.onLine && currentMode !== 'offline') {
+          try {
+            await getUnitOfflineSnapshot(userData.uicID);
+          } catch (snapshotError) {
+            console.warn('Unable to refresh offline custody snapshot:', snapshotError);
+          }
+        }
         await loadActiveSessions(userData.uicID);
         await loadAllSessions(userData.uicID);
       }
@@ -253,17 +253,23 @@ function Accountability() {
     }
   };
 
+  const loadOfflineSnapshot = async (uicId) => {
+    const cached = await loadCachedUnitOfflineSnapshot(uicId);
+    if (cached) return cached;
+    if (navigator.onLine) {
+      return getUnitOfflineSnapshot(uicId);
+    }
+    return null;
+  };
+
   // Load active accountability sessions
   const loadActiveSessions = async (uicId) => {
     try {
       let sessions;
 
       if (offlineMode) {
-        // Use DataStore in offline mode to query local data
-        sessions = await DataStore.query(
-          AccountabilitySession,
-          session => session.uicID.eq(uicId).status.eq('ACTIVE')
-        );
+        const snapshot = await loadOfflineSnapshot(uicId);
+        sessions = (snapshot?.accountabilitySessions || []).filter(session => session.status === 'ACTIVE');
       } else {
         // Use API in online mode
         const response = await client.graphql({
@@ -306,11 +312,8 @@ function Accountability() {
       let sessions;
 
       if (offlineMode) {
-        // Use DataStore in offline mode to query local data
-        sessions = await DataStore.query(
-          AccountabilitySession,
-          session => session.uicID.eq(uicId)
-        );
+        const snapshot = await loadOfflineSnapshot(uicId);
+        sessions = snapshot?.accountabilitySessions || [];
       } else {
         // Use API in online mode
         const response = await client.graphql({
@@ -357,48 +360,22 @@ function Accountability() {
       let items;
 
       if (offlineMode) {
-        // Use DataStore in offline mode
-        items = await DataStore.query(
-          AccountabilityItem,
-          item => item.sessionID.eq(sessionId)
-        );
-
-        // In offline mode, we need to fetch equipment item details separately
-        // and combine them with the accountability items
-        if (items && items.length > 0) {
-          for (let i = 0; i < items.length; i++) {
-            const item = items[i];
-            // Find the equipment item in DataStore by ID
-            let equipmentItem;
-
-            try {
-              equipmentItem = await DataStore.query(EquipmentItem, item.equipmentItemID);
-            } catch (e) {
-              console.warn('Error fetching equipment item:', e);
-            }
-
-            // If not found in DataStore, check the loaded hand-receipted items
-            if (!equipmentItem) {
-              equipmentItem = handReceiptedItems.find(e => e.id === item.equipmentItemID);
-            }
-
-            if (equipmentItem) {
-              // Create a similar structure to what the API would return
-              items[i] = {
-                ...item,
-                equipmentItem: {
-                  ...equipmentItem,
-                  equipmentMaster: masterItems[equipmentItem.equipmentMasterID]
-                }
-              };
-
-              // If we have the soldier data, add it
-              if (equipmentItem.assignedToID && soldiersMap[equipmentItem.assignedToID]) {
-                items[i].equipmentItem.assignedTo = soldiersMap[equipmentItem.assignedToID];
-              }
-            }
-          }
-        }
+        const snapshot = await loadOfflineSnapshot(uicID);
+        const equipmentById = new Map((snapshot?.equipmentItems || []).map(item => [item.id, item]));
+        const mastersById = new Map((snapshot?.equipmentMasters || []).map(master => [master.id, master]));
+        items = (snapshot?.accountabilityItems || [])
+          .filter(item => item.sessionID === sessionId)
+          .map(item => {
+            const equipmentItem = equipmentById.get(item.equipmentItemID) || handReceiptedItems.find(e => e.id === item.equipmentItemID);
+            return {
+              ...item,
+              equipmentItem: equipmentItem ? {
+                ...equipmentItem,
+                equipmentMaster: mastersById.get(equipmentItem.equipmentMasterID) || masterItems[equipmentItem.equipmentMasterID],
+                assignedTo: equipmentItem.assignedToID ? soldiersMap[equipmentItem.assignedToID] : null
+              } : null
+            };
+          });
       } else {
         // Use API in online mode
         const response = await client.graphql({
@@ -450,31 +427,36 @@ function Accountability() {
       setSuccess('');
 
       let session;
+      let createdLocalItems = null;
 
       if (offlineMode) {
-        // Create session in DataStore
-        session = await DataStore.save(
-          new AccountabilitySession({
-            uicID: uicID,
-            conductedByID: userID,
-            status: 'ACTIVE',
-            startedAt: new Date().toISOString(),
-            itemCount: selectedItems.length,
-            accountedForCount: 0
-          })
-        );
+        const snapshot = await loadOfflineSnapshot(uicID);
+        const now = new Date().toISOString();
+        session = {
+          id: crypto.randomUUID ? crypto.randomUUID() : `local-session-${Date.now()}`,
+          uicID,
+          conductedByID: userID,
+          status: 'ACTIVE',
+          startedAt: now,
+          itemCount: selectedItems.length,
+          accountedForCount: 0,
+          snapshotToken: snapshot?.snapshotToken || `uic:${uicID}:local:${now}`,
+          localOnly: true
+        };
 
-        // Create accountability items in DataStore
-        for (const item of selectedItems) {
-          await DataStore.save(
-            new AccountabilityItem({
-              sessionID: session.id,
-              equipmentItemID: item.id,
-              status: 'NOT_ACCOUNTED_FOR',
-              verificationMethod: 'DIRECT'
-            })
-          );
-        }
+        createdLocalItems = selectedItems.map(item => ({
+          id: crypto.randomUUID ? crypto.randomUUID() : `local-item-${item.id}-${Date.now()}`,
+          sessionID: session.id,
+          equipmentItemID: item.id,
+          status: 'NOT_ACCOUNTED_FOR',
+          verificationMethod: 'DIRECT',
+          equipmentItem: {
+            ...item,
+            equipmentMaster: masterItems[item.equipmentMasterID],
+            assignedTo: item.assignedToID ? soldiersMap[item.assignedToID] : null
+          },
+          localOnly: true
+        }));
       } else {
         // Create new session using API
         const createResponse = await client.graphql({
@@ -513,7 +495,11 @@ function Accountability() {
       setActiveSession(session);
 
       // Load accountability items
-      await loadAccountabilityItems(session.id);
+      if (createdLocalItems) {
+        setAccountabilityItems(createdLocalItems);
+      } else {
+        await loadAccountabilityItems(session.id);
+      }
 
       // Subscribe to updates if online and not in offline mode
       if (online && !offlineMode) {
@@ -578,75 +564,36 @@ function Accountability() {
       setProcessingAction(true);
 
       if (offlineMode) {
-        // Update item in DataStore
-        try {
-          // For items loaded from DataStore, they will have a proper DataStore model structure
-          if (item._deleted !== undefined) {
-            await DataStore.save(
-              AccountabilityItem.copyOf(item, updated => {
-                updated.status = 'ACCOUNTED_FOR';
-                updated.verificationMethod = method;
-                updated.verifiedByID = userID;
-                updated.verifiedAt = new Date().toISOString();
-              })
-            );
-          } else {
-            // For items from API that may not have proper DataStore structure
-            const original = await DataStore.query(AccountabilityItem, item.id);
-            if (original) {
-              await DataStore.save(
-                AccountabilityItem.copyOf(original, updated => {
-                  updated.status = 'ACCOUNTED_FOR';
-                  updated.verificationMethod = method;
-                  updated.verifiedByID = userID;
-                  updated.verifiedAt = new Date().toISOString();
-                })
-              );
-            } else {
-              // Create a new DataStore item if we can't find the original
-              const newItem = new AccountabilityItem({
-                id: item.id,
-                sessionID: item.sessionID,
-                equipmentItemID: item.equipmentItemID,
-                status: 'ACCOUNTED_FOR',
-                verificationMethod: method,
-                verifiedByID: userID,
-                verifiedAt: new Date().toISOString()
-              });
-              await DataStore.save(newItem);
-            }
-          }
+        const verifiedAt = new Date().toISOString();
+        await queueCheckInEvent({
+          uicID,
+          sessionID: activeSession.id,
+          accountabilityItemID: item.id,
+          equipmentItemID: item.equipmentItemID,
+          snapshotToken: activeSession.snapshotToken || `uic:${uicID}:local`,
+          status: 'ACCOUNTED_FOR',
+          verificationMethod: method,
+          verifiedByID: userID,
+          verifiedAt
+        });
 
-          // Update local state
-          setAccountabilityItems(prev =>
-            prev.map(i =>
-              i.id === item.id
-                ? {...i, status: 'ACCOUNTED_FOR', verificationMethod: method, verifiedByID: userID}
-                : i
-            )
-          );
+        setAccountabilityItems(prev =>
+          prev.map(i =>
+            i.id === item.id
+              ? { ...i, status: 'ACCOUNTED_FOR', verificationMethod: method, verifiedByID: userID, verifiedAt }
+              : i
+          )
+        );
 
-          // Update session stats
-          const newCount = accountabilityItems.filter(i =>
-            i.id === item.id ? true : i.status === 'ACCOUNTED_FOR'
-          ).length;
+        const newCount = accountabilityItems.filter(i =>
+          i.id === item.id ? true : i.status === 'ACCOUNTED_FOR'
+        ).length;
 
-          // Update session in DataStore
-          const originalSession = await DataStore.query(AccountabilitySession, activeSession.id);
-          if (originalSession) {
-            const updatedSession = await DataStore.save(
-              AccountabilitySession.copyOf(originalSession, updated => {
-                updated.accountedForCount = newCount;
-              })
-            );
-
-            setActiveSession(updatedSession);
-          }
-        } catch (error) {
-          console.error('Error updating item in DataStore:', error);
-          setError('Failed to update item status. Please try again.');
-          return;
-        }
+        setActiveSession(prev => ({
+          ...prev,
+          accountedForCount: newCount
+        }));
+        setPendingSyncs(prev => prev + 1);
       } else {
         if (!online) {
           setError('You must be online to mark items as accounted for when not in offline mode.');
@@ -724,85 +671,20 @@ function Accountability() {
       setError('');
 
       if (offlineMode) {
-        // Handle verification in offline mode
-        // Query all active sessions from DataStore
-        const allSessions = await DataStore.query(
-          AccountabilitySession,
-          session => session.uicID.eq(uicID).status.eq('ACTIVE')
-        );
-
-        // Loop through sessions to find matching items
-        let foundMatch = false;
-
-        for (const session of allSessions) {
-          // Get all items for this session
-          const sessionItems = await DataStore.query(
-            AccountabilityItem,
-            item => item.sessionID.eq(session.id)
-          );
-
-          // For each item, find the matching equipment item
-          for (const accountabilityItem of sessionItems) {
-            // First check in DataStore for equipment item
-            let matchingEquipment = null;
-
-            try {
-              // Query all equipment items
-              const equipmentItems = await DataStore.query(
-                EquipmentItem,
-                item => item.serialNumber.eq(serialNumber)
-              );
-
-              // Find matching item that is also in this accountability session
-              matchingEquipment = equipmentItems.find(
-                item => item.id === accountabilityItem.equipmentItemID &&
-                accountabilityItem.status !== 'ACCOUNTED_FOR'
-              );
-            } catch (e) {
-              console.warn('Error querying equipment items:', e);
-            }
-
-            // If not found in DataStore, check handReceiptedItems
-            if (!matchingEquipment) {
-              matchingEquipment = handReceiptedItems.find(item =>
-                item.id === accountabilityItem.equipmentItemID &&
-                item.serialNumber?.toLowerCase() === serialNumber.toLowerCase() &&
-                accountabilityItem.status !== 'ACCOUNTED_FOR'
-              );
-            }
-
-            if (matchingEquipment) {
-              // We found a match that's in this accountability session
-              // Mark as accounted for in DataStore
-              await DataStore.save(
-                AccountabilityItem.copyOf(accountabilityItem, updated => {
-                  updated.status = 'ACCOUNTED_FOR';
-                  updated.verificationMethod = 'SELF_SERVICE';
-                  updated.verifiedByID = userID;
-                  updated.verifiedAt = new Date().toISOString();
-                })
-              );
-
-              // Update session counter
-              const originalSession = await DataStore.query(AccountabilitySession, session.id);
-              if (originalSession) {
-                await DataStore.save(
-                  AccountabilitySession.copyOf(originalSession, updated => {
-                    updated.accountedForCount = originalSession.accountedForCount + 1;
-                  })
-                );
-              }
-
-              foundMatch = true;
-              setSuccess(`Successfully verified item with serial number ${serialNumber}`);
-              break;
-            }
-          }
-
-          if (foundMatch) break;
+        if (!activeSession) {
+          setError('Start or resume an accountability session before scanning serial numbers offline.');
+          return;
         }
 
-        if (!foundMatch) {
+        const matchingItem = accountabilityItems.find(item =>
+          item.status !== 'ACCOUNTED_FOR' &&
+          item.equipmentItem?.serialNumber?.toLowerCase() === serialNumber.toLowerCase()
+        );
+
+        if (matchingItem) {
+          await markItemAsAccountedFor(matchingItem, 'SELF_SERVICE');
+          setSuccess(`Successfully verified item with serial number ${serialNumber}`);
+        } else {
           setError(`No matching item found with serial number ${serialNumber}`);
         }
       } else {
@@ -874,16 +756,11 @@ function Accountability() {
       setSummaryData(summary);
 
       if (offlineMode) {
-        // Update session in DataStore
-        const original = await DataStore.query(AccountabilitySession, activeSession.id);
-        if (original) {
-          await DataStore.save(
-            AccountabilitySession.copyOf(original, updated => {
-              updated.status = 'COMPLETED';
-              updated.completedAt = new Date().toISOString();
-            })
-          );
-        }
+        setActiveSession(prev => ({
+          ...prev,
+          status: 'COMPLETED',
+          completedAt: new Date().toISOString()
+        }));
       } else {
         // Update session status to COMPLETED using API
         await client.graphql({
@@ -1210,8 +1087,8 @@ function Accountability() {
       let session;
 
       if (offlineMode) {
-        // Get session from DataStore
-        session = await DataStore.query(AccountabilitySession, sessionId);
+        const snapshot = await loadOfflineSnapshot(uicID);
+        session = (snapshot?.accountabilitySessions || []).find(candidate => candidate.id === sessionId);
 
         if (!session || session.status !== 'ACTIVE') {
           throw new Error('Can only resume active sessions');

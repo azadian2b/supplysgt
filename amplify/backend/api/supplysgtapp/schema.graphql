@@ -15,6 +15,9 @@ type UIC @model
   accountabilitySessions: [AccountabilitySession] @hasMany(indexName: "byUIC", fields: ["id"])
   # Add relationship for additional UICs
   additionalUICs: [AdditionalUIC] @hasMany(indexName: "byUIC", fields: ["id"])
+  _deleted: Boolean
+  _version: Int
+  _lastChangedAt: AWSTimestamp
 }
 
 type User @model
@@ -42,6 +45,9 @@ type User @model
   verifiedItems: [AccountabilityItem] @hasMany(indexName: "byVerifiedBy", fields: ["id"])
   # Add field for additional UICs that supply sergeants can work with
   additionalUICs: [AdditionalUIC] @hasMany(indexName: "byUser", fields: ["id"])
+  _deleted: Boolean
+  _version: Int
+  _lastChangedAt: AWSTimestamp
 }
 
 type UICMembershipRequest @model
@@ -60,6 +66,9 @@ type UICMembershipRequest @model
   approvedBy: ID
   approvedAt: AWSDateTime
   rejectionReason: String
+  _deleted: Boolean
+  _version: Int
+  _lastChangedAt: AWSTimestamp
 }
 
 type UICCreationRequest @model
@@ -78,6 +87,9 @@ type UICCreationRequest @model
   approvedAt: AWSDateTime
   rejectionReason: String
   createdUIC: ID
+  _deleted: Boolean
+  _version: Int
+  _lastChangedAt: AWSTimestamp
 }
 
 # New Soldier model for tracking all soldiers in a UIC
@@ -103,6 +115,9 @@ type Soldier @model
   handReceiptStatuses: [HandReceiptStatus] @hasMany(indexName: "byToSoldier", fields: ["id"])
   createdAt: AWSDateTime!
   updatedAt: AWSDateTime!
+  _deleted: Boolean
+  _version: Int
+  _lastChangedAt: AWSTimestamp
 }
 
 enum Role {
@@ -139,6 +154,9 @@ type EquipmentMaster @model
   imageKey: String  # S3 Storage key for the item image
   subComponents: [String]  # Array of NSNs for related components
   equipmentItems: [EquipmentItem] @hasMany(indexName: "byEquipmentMaster", fields: ["id"])
+  _deleted: Boolean
+  _version: Int
+  _lastChangedAt: AWSTimestamp
 }
 
 # Specific Equipment Items based on the master item
@@ -166,6 +184,9 @@ type EquipmentItem @model
   accountabilityItems: [AccountabilityItem] @hasMany(indexName: "byEquipmentItem", fields: ["id"])
   createdAt: AWSDateTime!
   updatedAt: AWSDateTime!
+  _deleted: Boolean
+  _version: Int
+  _lastChangedAt: AWSTimestamp
 }
 
 # Groups of equipment items
@@ -183,6 +204,9 @@ type EquipmentGroup @model
   assignedTo: Soldier @belongsTo(fields: ["assignedToID"])
   createdAt: AWSDateTime!
   updatedAt: AWSDateTime!
+  _deleted: Boolean
+  _version: Int
+  _lastChangedAt: AWSTimestamp
 }
 
 # Hand Receipt Status to track issued equipment
@@ -204,6 +228,9 @@ type HandReceiptStatus @model
   pdfS3Key: String
   createdAt: AWSDateTime!
   updatedAt: AWSDateTime!
+  _deleted: Boolean
+  _version: Int
+  _lastChangedAt: AWSTimestamp
 }
 
 enum HandReceiptStatusType {
@@ -230,6 +257,9 @@ type AccountabilitySession @model
   accountabilityItems: [AccountabilityItem] @hasMany(indexName: "bySession", fields: ["id"])
   createdAt: AWSDateTime!
   updatedAt: AWSDateTime!
+  _deleted: Boolean
+  _version: Int
+  _lastChangedAt: AWSTimestamp
 }
 
 type AccountabilityItem @model
@@ -251,6 +281,45 @@ type AccountabilityItem @model
   notes: String
   createdAt: AWSDateTime!
   updatedAt: AWSDateTime!
+  _deleted: Boolean
+  _version: Int
+  _lastChangedAt: AWSTimestamp
+}
+
+# Append-only events used by web and future Swift clients to queue offline
+# accountability check-ins without mutating custody records while disconnected.
+type AccountabilityCheckInEvent @model
+@auth(rules: [
+  { allow: private }
+]) {
+  id: ID!
+  clientMutationId: String! @index(name: "byClientMutationId")
+  deviceId: String!
+  uicID: ID! @index(name: "byUIC")
+  sessionID: ID! @index(name: "bySession")
+  accountabilityItemID: ID @index(name: "byAccountabilityItem")
+  equipmentItemID: ID! @index(name: "byEquipmentItem")
+  snapshotToken: String!
+  status: ItemStatus!
+  verificationMethod: VerificationMethod!
+  verifiedByID: ID
+  verifiedAt: AWSDateTime!
+  notes: String
+  conflictStatus: CheckInConflictStatus!
+  conflictReason: String
+  appliedAt: AWSDateTime
+  createdAt: AWSDateTime!
+  updatedAt: AWSDateTime!
+  _deleted: Boolean
+  _version: Int
+  _lastChangedAt: AWSTimestamp
+}
+
+enum CheckInConflictStatus {
+  PENDING
+  APPLIED
+  STALE_ASSIGNMENT
+  REJECTED
 }
 
 enum SessionStatus {
@@ -298,4 +367,7 @@ type AdditionalUIC @model
   status: RequestStatus!
   createdAt: AWSDateTime!
   updatedAt: AWSDateTime!
+  _deleted: Boolean
+  _version: Int
+  _lastChangedAt: AWSTimestamp
 }

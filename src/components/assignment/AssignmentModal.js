@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { generateClient } from 'aws-amplify/api';
-import { DataStore } from '@aws-amplify/datastore';
+import { DataStore } from '../../utils/GraphQLDataStoreCompat';
 import { getUrl } from 'aws-amplify/storage';
 import { updateEquipmentItem, updateEquipmentGroup } from '../../graphql/mutations';
 import './Assignment.css';

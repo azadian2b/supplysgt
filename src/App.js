@@ -1,6 +1,5 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
-import { Amplify } from 'aws-amplify';
 import { Authenticator } from '@aws-amplify/ui-react';
 import '@aws-amplify/ui-react/styles.css';
 import './App.css';
@@ -19,10 +18,6 @@ import Admin from './pages/Admin';
 // Components
 import Header from './components/Header';
 import Footer from './components/Footer';
-
-// Import and configure Amplify with aws-exports
-import awsExports from './aws-exports';
-Amplify.configure(awsExports);
 
 // Navigation restoration component
 function NavigationRestorer() {

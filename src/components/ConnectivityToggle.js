@@ -1,51 +1,42 @@
 import React, { useEffect, useState } from 'react';
 import '../styles/ConnectivityToggle.css';
+import { getConnectivityMode, subscribeConnectivityMode } from '../offline/connectivityMode';
 
 const ConnectivityToggle = ({ onConnectivityChange }) => {
-  // Get the initial connectivity mode from localStorage or default to 'online'
-  const [isOnline, setIsOnline] = useState(() => {
-    const savedMode = localStorage.getItem('connectivityMode');
-    return savedMode ? savedMode === 'online' : true;
-  });
+  const [isOnline, setIsOnline] = useState(true);
   const [isChanging, setIsChanging] = useState(false);
 
-  // Apply the connectivity mode when component mounts or mode changes
   useEffect(() => {
-    const mode = isOnline ? 'online' : 'offline';
-    localStorage.setItem('connectivityMode', mode);
-    
-    // Notify parent components about the change
-    if (onConnectivityChange) {
-      const applyChange = async () => {
-        setIsChanging(true);
-        try {
-          await onConnectivityChange(isOnline);
-        } finally {
-          setIsChanging(false);
-        }
-      };
-      applyChange();
-    }
-  }, [isOnline, onConnectivityChange]);
-  
-  // Listen for storage events (changes from other tabs)
-  useEffect(() => {
-    const handleStorageChange = (event) => {
-      if (event.key === 'connectivityMode') {
-        const newMode = event.newValue;
-        setIsOnline(newMode === 'online');
+    let cancelled = false;
+
+    getConnectivityMode().then(mode => {
+      if (!cancelled) {
+        setIsOnline(mode !== 'offline');
       }
-    };
-    
-    window.addEventListener('storage', handleStorageChange);
+    });
+
+    const unsubscribe = subscribeConnectivityMode(mode => {
+      setIsOnline(mode !== 'offline');
+    });
+
     return () => {
-      window.removeEventListener('storage', handleStorageChange);
+      cancelled = true;
+      unsubscribe();
     };
   }, []);
 
-  const toggleConnectivity = () => {
+  const toggleConnectivity = async () => {
     if (!isChanging) {
-      setIsOnline(!isOnline);
+      const nextOnline = !isOnline;
+      setIsChanging(true);
+      try {
+        if (onConnectivityChange) {
+          await onConnectivityChange(nextOnline);
+        }
+        setIsOnline(nextOnline);
+      } finally {
+        setIsChanging(false);
+      }
     }
   };
 
@@ -70,4 +61,4 @@ const ConnectivityToggle = ({ onConnectivityChange }) => {
   );
 };
 
-export default ConnectivityToggle; 
+export default ConnectivityToggle;

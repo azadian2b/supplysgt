@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { DataStore, SortDirection } from '@aws-amplify/datastore';
+import { DataStore, SortDirection } from '../utils/GraphQLDataStoreCompat';
 import { getCurrentUser } from 'aws-amplify/auth';
 import { User, Soldier, UIC } from '../models';
 import './Pages.css';

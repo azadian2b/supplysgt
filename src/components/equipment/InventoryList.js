@@ -2,8 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { generateClient } from 'aws-amplify/api';
 import { getCurrentUser } from 'aws-amplify/auth';
 import { deleteEquipmentItem, updateEquipmentItem } from '../../graphql/mutations';
-import { DataStore } from '@aws-amplify/datastore';
+import { DataStore } from '../../utils/GraphQLDataStoreCompat';
 import DataStoreUtil from '../../utils/DataStoreSync';
+import { getConnectivityModeSnapshot, subscribeConnectivityMode } from '../../offline/connectivityMode';
+import { getUnitOfflineSnapshot, loadCachedUnitOfflineSnapshot } from '../../offline/offlineCustodyRepository';
 import AssignmentModal from '../assignment/AssignmentModal';
 import './Equipment.css';
 import './InventoryStyles.css';
@@ -22,7 +24,7 @@ function InventoryList({ onBack }) {
   const [showDuplicatesModal, setShowDuplicatesModal] = useState(false);
   const [duplicateGroups, setDuplicateGroups] = useState([]);
   const [selectedItemsToDelete, setSelectedItemsToDelete] = useState({});
-  const [isOnlineMode, setIsOnlineMode] = useState(localStorage.getItem('connectivityMode') !== 'offline');
+  const [isOnlineMode, setIsOnlineMode] = useState(getConnectivityModeSnapshot() !== 'offline');
   const [showOrphanedItemsModal, setShowOrphanedItemsModal] = useState(false);
   const [orphanedItems, setOrphanedItems] = useState([]);
   const [processingOrphans, setProcessingOrphans] = useState(false);
@@ -52,21 +54,12 @@ function InventoryList({ onBack }) {
 
   // Check for connectivity mode changes
   useEffect(() => {
-    const checkConnectivityMode = () => {
-      const mode = localStorage.getItem('connectivityMode');
+    const checkConnectivityMode = (mode = getConnectivityModeSnapshot()) => {
       setIsOnlineMode(mode !== 'offline');
     };
 
-    // Initial check
     checkConnectivityMode();
-
-    // Set up event listener for storage changes
-    window.addEventListener('storage', checkConnectivityMode);
-
-    // Clean up the event listener
-    return () => {
-      window.removeEventListener('storage', checkConnectivityMode);
-    };
+    return subscribeConnectivityMode(checkConnectivityMode);
   }, []);
 
   // Load inventory based on connectivity mode
@@ -80,7 +73,7 @@ function InventoryList({ onBack }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOnlineMode]);
 
-  // Fetch data from local DataStore (offline mode)
+  // Fetch data from the durable offline custody snapshot.
   const fetchFromLocalDataStore = async () => {
     try {
       setLoading(true);
@@ -111,103 +104,50 @@ function InventoryList({ onBack }) {
 
       setUicID(userData.uicID);
 
-      // Import the models
-      const { EquipmentItem, Soldier } = await import('../../models');
-
-      // Use DataStore to get equipment items from local storage
-      console.log('Querying local DataStore for EquipmentItem with uicID:', userData.uicID);
-      const items = await DataStore.query(
-        EquipmentItem,
-        item => item.uicID.eq(userData.uicID)
-      );
-      console.log('Local DataStore items:', items.length, items);
-
-      // Load soldiers from DataStore to handle assignments
-      let soldiersMap = {};
-      try {
-        const soldiers = await DataStore.query(
-          Soldier,
-          soldier => soldier.uicID.eq(userData.uicID)
-        );
-
-        soldiers.forEach(soldier => {
-          soldiersMap[soldier.id] = soldier;
-        });
-        console.log('Local DataStore soldiers:', soldiers.length);
-      } catch (error) {
-        console.error('Error loading soldiers from DataStore:', error);
-      }
-
-      if (items.length === 0) {
-        console.log('No items found in local DataStore. Checking if we need to load from API first...');
-
-        // If we don't have any items locally but we do have internet connection,
-        // we could attempt to load from the API once
+      let snapshot = await loadCachedUnitOfflineSnapshot(userData.uicID);
+      if (!snapshot?.custodyRows?.length) {
         if (navigator.onLine) {
           const shouldFetch = window.confirm(
-            'No items found in local storage. Would you like to load items from the backend once before going offline?'
+            'No offline inventory snapshot was found. Load this UIC from the backend now so it is available offline?'
           );
 
           if (shouldFetch) {
-            // Temporarily set to online mode
-            const connectivityMode = localStorage.getItem('connectivityMode');
-            try {
-              localStorage.setItem('connectivityMode', 'online');
-              await DataStore.start();
-              await fetchDirectFromAPI();
-              return; // Exit after fetching from API
-            } finally {
-              // Restore offline mode
-              localStorage.setItem('connectivityMode', connectivityMode);
-              if (connectivityMode === 'offline') {
-                await DataStore.stop();
-              }
-            }
+            snapshot = await getUnitOfflineSnapshot(userData.uicID);
+          } else {
+            setError('No offline inventory snapshot is available for this UIC.');
+            return;
           }
+        } else {
+          setError('No offline inventory snapshot is available for this UIC. Connect once and sync data before going offline.');
+          return;
         }
       }
 
-      // Process these items to add master data (from whatever is in local DataStore)
-      const processedItems = items.map(item => {
-        // Add soldier information if assigned
-        let assignedToName = null;
-        if (item.assignedToID && soldiersMap[item.assignedToID]) {
-          const soldier = soldiersMap[item.assignedToID];
-          assignedToName = `${soldier.rank || ''} ${soldier.lastName}, ${soldier.firstName}`;
-        }
+      const processedItems = snapshot.custodyRows.map(row => ({
+        id: row.equipmentItemID,
+        uicID: snapshot.uicID,
+        equipmentMasterID: row.equipmentMasterID,
+        nsn: row.nsn || '',
+        lin: row.lin || '',
+        serialNumber: row.serialNumber || '',
+        stockNumber: row.stockNumber || '',
+        location: row.location || '',
+        assignedToID: row.assignedToID || null,
+        assignedToName: row.assignedToName,
+        maintenanceStatus: row.maintenanceStatus || 'OPERATIONAL',
+        isPartOfGroup: Boolean(row.groupID),
+        groupID: row.groupID || null,
+        updatedAt: row.itemUpdatedAt,
+        _version: row.itemVersion,
+        commonName: row.commonName || `Item ${row.nsn || ''}`,
+        isSerialTracked: row.isSerialTracked,
+        isSensitiveItem: row.isSensitiveItem,
+        isConsumable: false
+      }));
 
-        // Extract only the fields we need for display and handle potential nulls
-        return {
-          id: item.id,
-          uicID: item.uicID,
-          equipmentMasterID: item.equipmentMasterID,
-          nsn: item.nsn || '',
-          lin: item.lin || '',
-          serialNumber: item.serialNumber || '',
-          stockNumber: item.stockNumber || '',
-          location: item.location || '',
-          assignedToID: item.assignedToID || null,
-          assignedToName: assignedToName,
-          maintenanceStatus: item.maintenanceStatus || 'OPERATIONAL',
-          isPartOfGroup: item.isPartOfGroup || false,
-          groupID: item.groupID || null,
-          createdAt: item.createdAt,
-          updatedAt: item.updatedAt,
-          _version: item._version,
-          _deleted: item._deleted,
-          _lastChangedAt: item._lastChangedAt,
-          // Add these fields to avoid UI errors
-          commonName: item.commonName || `Item ${item.nsn || ''}`,
-          isSerialTracked: false,
-          isSensitiveItem: false,
-          isConsumable: false
-        };
-      });
-
-      console.log('Setting inventory with local data:', processedItems.length, 'items');
       setInventory(processedItems);
     } catch (error) {
-      console.error('Error fetching from local DataStore:', error);
+      console.error('Error fetching offline custody snapshot:', error);
       setError(`Failed to load inventory from local storage: ${error.message}. Try enabling online mode.`);
     } finally {
       setLoading(false);
@@ -227,8 +167,10 @@ function InventoryList({ onBack }) {
       setLoading(true);
       setInventory([]); // Clear inventory in state immediately
 
-      // Use our utility to clear and sync DataStore
       await DataStoreUtil.clearAndSync();
+      if (uicID) {
+        await getUnitOfflineSnapshot(uicID);
+      }
 
       // Use the direct API fetch method for consistency
       await fetchDirectFromAPI();

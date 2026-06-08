@@ -3,13 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "@aws-amplify/datastore": "^5.0.76",
+    "@apollo/client": "^3.14.0",
     "@aws-amplify/ui-react": "^6.9.3",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.2.0",
     "@testing-library/user-event": "^13.5.0",
-    "aws-amplify": "^6.13.5",
+    "apollo3-cache-persist": "^0.15.0",
+    "aws-amplify": "^6.16.2",
+    "graphql": "^16.10.0",
+    "localforage": "^1.10.0",
     "pdf-lib": "^1.17.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -24,6 +27,7 @@
     "test": "node node_modules/react-scripts/bin/react-scripts.js test",
     "test:e2e": "node node_modules/react-scripts/bin/react-scripts.js build && node node_modules/playwright/cli.js test",
     "test:e2e:headed": "node node_modules/playwright/cli.js test --headed",
+    "amplify:assess": "amplify gen2-migration assess",
     "eject": "node node_modules/react-scripts/bin/react-scripts.js eject"
   },
   "eslintConfig": {
@@ -45,6 +49,7 @@
     ]
   },
   "devDependencies": {
+    "@aws-amplify/cli": "^14.5.0",
     "@playwright/test": "^1.60.0"
   }
 }
