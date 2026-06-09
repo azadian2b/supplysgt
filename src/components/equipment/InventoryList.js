@@ -5,7 +5,12 @@ import { deleteEquipmentItem, updateEquipmentItem } from '../../graphql/mutation
 import { DataStore } from '../../utils/GraphQLDataStoreCompat';
 import DataStoreUtil from '../../utils/DataStoreSync';
 import { getConnectivityModeSnapshot, subscribeConnectivityMode } from '../../offline/connectivityMode';
-import { getUnitOfflineSnapshot, loadCachedUnitOfflineSnapshot } from '../../offline/offlineCustodyRepository';
+import {
+  getCachedActiveUIC,
+  getUnitOfflineSnapshot,
+  loadCachedUnitOfflineSnapshot,
+  setCachedActiveUIC
+} from '../../offline/offlineCustodyRepository';
 import AssignmentModal from '../assignment/AssignmentModal';
 import './Equipment.css';
 import './InventoryStyles.css';
@@ -39,6 +44,98 @@ function InventoryList({ onBack }) {
   const actionMenuRef = useRef(null);
 
   const client = generateClient();
+
+  const fetchCurrentUserProfile = async () => {
+    const { username } = await getCurrentUser();
+    const userResponse = await client.graphql({
+      query: `query GetUserByOwner($owner: String!) {
+        usersByOwner(owner: $owner, limit: 1) {
+          items {
+            id
+            uicID
+          }
+        }
+      }`,
+      variables: { owner: username },
+      authMode: 'userPool',
+      headers: {
+        'Cache-Control': 'no-cache',
+        'x-cache-buster': new Date().getTime().toString()
+      }
+    });
+
+    return userResponse.data.usersByOwner.items[0] || null;
+  };
+
+  const resolveActiveUICID = async ({ allowNetwork = true } = {}) => {
+    if (uicID) {
+      return uicID;
+    }
+
+    if (allowNetwork) {
+      try {
+        const userData = await fetchCurrentUserProfile();
+        if (userData?.uicID) {
+          setUicID(userData.uicID);
+          await setCachedActiveUIC(userData.uicID);
+          return userData.uicID;
+        }
+      } catch (error) {
+        console.warn('Could not resolve UIC from backend profile, falling back to offline cache:', error);
+      }
+    }
+
+    const cachedUIC = await getCachedActiveUIC();
+    if (cachedUIC) {
+      setUicID(cachedUIC);
+      return cachedUIC;
+    }
+
+    return null;
+  };
+
+  const snapshotToInventoryItems = (snapshot) => {
+    if (snapshot?.custodyRows?.length) {
+      return snapshot.custodyRows.map(row => ({
+        id: row.equipmentItemID,
+        uicID: snapshot.uicID,
+        equipmentMasterID: row.equipmentMasterID,
+        nsn: row.nsn || '',
+        lin: row.lin || '',
+        serialNumber: row.serialNumber || '',
+        stockNumber: row.stockNumber || '',
+        location: row.location || '',
+        assignedToID: row.assignedToID || null,
+        assignedToName: row.assignedToName,
+        maintenanceStatus: row.maintenanceStatus || 'OPERATIONAL',
+        isPartOfGroup: Boolean(row.groupID),
+        groupID: row.groupID || null,
+        updatedAt: row.itemUpdatedAt,
+        _version: row.itemVersion,
+        commonName: row.commonName || `Item ${row.nsn || ''}`,
+        isSerialTracked: row.isSerialTracked,
+        isSensitiveItem: row.isSensitiveItem,
+        isConsumable: false
+      }));
+    }
+
+    const soldiersById = new Map((snapshot?.soldiers || []).map(soldier => [soldier.id, soldier]));
+    const mastersById = new Map((snapshot?.equipmentMasters || []).map(master => [master.id, master]));
+
+    return (snapshot?.equipmentItems || []).map(item => {
+      const master = item.equipmentMasterID ? mastersById.get(item.equipmentMasterID) : null;
+      const soldier = item.assignedToID ? soldiersById.get(item.assignedToID) : null;
+
+      return {
+        ...item,
+        commonName: master?.commonName || `Item ${item.nsn || ''}`,
+        isSerialTracked: Boolean(master?.isSerialTracked),
+        isSensitiveItem: Boolean(master?.isSensitiveItem),
+        isConsumable: Boolean(master?.isConsumable),
+        assignedToName: soldier ? `${soldier.rank || ''} ${soldier.lastName}, ${soldier.firstName}`.trim() : null
+      };
+    });
+  };
 
   // Effect to clear messages after a timeout
   useEffect(() => {
@@ -79,71 +176,24 @@ function InventoryList({ onBack }) {
       setLoading(true);
       setInventory([]); // Clear existing inventory
 
-      // Get the current user
-      const { username } = await getCurrentUser();
-
-      // Query users to find the UIC ID
-      const userResponse = await client.graphql({
-        query: `query GetUserByOwner($owner: String!) {
-          usersByOwner(owner: $owner, limit: 1) {
-            items {
-              id
-              uicID
-            }
-          }
-        }`,
-        variables: { owner: username }
-      });
-
-      const userData = userResponse.data.usersByOwner.items[0];
-      if (!userData || !userData.uicID) {
+      const activeUICID = await resolveActiveUICID({ allowNetwork: navigator.onLine });
+      if (!activeUICID) {
         setError('You must be assigned to a UIC to view inventory.');
         setLoading(false);
         return;
       }
 
-      setUicID(userData.uicID);
-
-      let snapshot = await loadCachedUnitOfflineSnapshot(userData.uicID);
-      if (!snapshot?.custodyRows?.length) {
+      let snapshot = await loadCachedUnitOfflineSnapshot(activeUICID);
+      let processedItems = snapshotToInventoryItems(snapshot);
+      if (processedItems.length === 0) {
         if (navigator.onLine) {
-          const shouldFetch = window.confirm(
-            'No offline inventory snapshot was found. Load this UIC from the backend now so it is available offline?'
-          );
-
-          if (shouldFetch) {
-            snapshot = await getUnitOfflineSnapshot(userData.uicID);
-          } else {
-            setError('No offline inventory snapshot is available for this UIC.');
-            return;
-          }
+          snapshot = await getUnitOfflineSnapshot(activeUICID);
+          processedItems = snapshotToInventoryItems(snapshot);
         } else {
           setError('No offline inventory snapshot is available for this UIC. Connect once and sync data before going offline.');
           return;
         }
       }
-
-      const processedItems = snapshot.custodyRows.map(row => ({
-        id: row.equipmentItemID,
-        uicID: snapshot.uicID,
-        equipmentMasterID: row.equipmentMasterID,
-        nsn: row.nsn || '',
-        lin: row.lin || '',
-        serialNumber: row.serialNumber || '',
-        stockNumber: row.stockNumber || '',
-        location: row.location || '',
-        assignedToID: row.assignedToID || null,
-        assignedToName: row.assignedToName,
-        maintenanceStatus: row.maintenanceStatus || 'OPERATIONAL',
-        isPartOfGroup: Boolean(row.groupID),
-        groupID: row.groupID || null,
-        updatedAt: row.itemUpdatedAt,
-        _version: row.itemVersion,
-        commonName: row.commonName || `Item ${row.nsn || ''}`,
-        isSerialTracked: row.isSerialTracked,
-        isSensitiveItem: row.isSensitiveItem,
-        isConsumable: false
-      }));
 
       setInventory(processedItems);
     } catch (error) {
@@ -165,23 +215,29 @@ function InventoryList({ onBack }) {
     try {
       setSyncInProgress(true);
       setLoading(true);
-      setInventory([]); // Clear inventory in state immediately
 
       await DataStoreUtil.clearAndSync();
-      if (uicID) {
-        await getUnitOfflineSnapshot(uicID);
+      const activeUICID = await resolveActiveUICID({ allowNetwork: true });
+      if (!activeUICID) {
+        setError('You must be assigned to a UIC before inventory can be cached for offline use.');
+        return;
+      }
+
+      const snapshot = await getUnitOfflineSnapshot(activeUICID);
+      const cachedItemCount = snapshotToInventoryItems(snapshot).length;
+      if (cachedItemCount === 0) {
+        setError('Sync completed, but no inventory rows were cached for offline use.');
+      } else {
+        setSuccess(`Synced ${cachedItemCount} inventory items for offline use.`);
       }
 
       // Use the direct API fetch method for consistency
       await fetchDirectFromAPI();
-
-      setSyncInProgress(false);
-      alert('Data successfully synced with backend. Your inventory should now be up-to-date.');
     } catch (error) {
       console.error('Error syncing data:', error);
-      setError('Failed to sync data. Please try again.');
-      setSyncInProgress(false);
+      setError(`Failed to sync data: ${error.message || 'Please try again.'}`);
     } finally {
+      setSyncInProgress(false);
       setLoading(false);
     }
   };
@@ -529,25 +585,7 @@ function InventoryList({ onBack }) {
       setInventory([]); // Clear existing inventory
 
       // Get user's UIC
-      const { username } = await getCurrentUser();
-      const userResponse = await client.graphql({
-        query: `query GetUserByOwner($owner: String!) {
-          usersByOwner(owner: $owner, limit: 1) {
-            items {
-              id
-              uicID
-            }
-          }
-        }`,
-        variables: { owner: username },
-        authMode: 'userPool',
-        headers: {
-          'Cache-Control': 'no-cache',
-          'x-cache-buster': new Date().getTime().toString()
-        }
-      });
-
-      const userData = userResponse.data.usersByOwner.items[0];
+      const userData = await fetchCurrentUserProfile();
       if (!userData || !userData.uicID) {
         setError('You must be assigned to a UIC to view inventory.');
         setLoading(false);
@@ -555,6 +593,7 @@ function InventoryList({ onBack }) {
       }
 
       setUicID(userData.uicID);
+      await setCachedActiveUIC(userData.uicID);
 
       // Fetch equipment items directly, matching the debug tool approach
       const equipmentResponse = await client.graphql({

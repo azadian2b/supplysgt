@@ -1,16 +1,22 @@
 import { getCurrentUser } from 'aws-amplify/auth';
-import { getApolloClient, gql } from '../api/apolloClient';
+import { generateClient } from 'aws-amplify/api';
 import { createAccountabilityCheckInEvent } from '../graphql/customOperations';
 import { OFFLINE_SCHEMA_VERSION, cacheKey, getCached, setCached, removeCached } from './offlineStore';
 
 const DEVICE_ID_KEY = 'device-id';
+const ACTIVE_UIC_KEY = userId => cacheKey('active-uic', userId);
 const PINNED_UICS_KEY = userId => cacheKey('pinned-uics', userId);
 const SNAPSHOT_KEY = (userId, uicID) => cacheKey('snapshot', OFFLINE_SCHEMA_VERSION, userId, uicID);
 const OUTBOX_KEY = userId => cacheKey('check-in-outbox', OFFLINE_SCHEMA_VERSION, userId);
 
-const SOLDIERS_BY_UIC = gql`
+const SOLDIERS_BY_UIC = /* GraphQL */ `
   query OfflineSoldiersByUIC($uicID: ID!, $nextToken: String) {
-    soldiersByUicID(uicID: $uicID, limit: 1000, nextToken: $nextToken) {
+    soldiersByUicID(
+      uicID: $uicID,
+      filter: { _deleted: { ne: true } },
+      limit: 1000,
+      nextToken: $nextToken
+    ) {
       items {
         id
         firstName
@@ -29,14 +35,18 @@ const SOLDIERS_BY_UIC = gql`
         _lastChangedAt
       }
       nextToken
-      startedAt
     }
   }
 `;
 
-const EQUIPMENT_BY_UIC = gql`
+const EQUIPMENT_BY_UIC = /* GraphQL */ `
   query OfflineEquipmentByUIC($uicID: ID!, $nextToken: String) {
-    equipmentItemsByUicID(uicID: $uicID, limit: 1000, nextToken: $nextToken) {
+    equipmentItemsByUicID(
+      uicID: $uicID,
+      filter: { _deleted: { ne: true } },
+      limit: 1000,
+      nextToken: $nextToken
+    ) {
       items {
         id
         uicID
@@ -57,14 +67,18 @@ const EQUIPMENT_BY_UIC = gql`
         _lastChangedAt
       }
       nextToken
-      startedAt
     }
   }
 `;
 
-const GROUPS_BY_UIC = gql`
+const GROUPS_BY_UIC = /* GraphQL */ `
   query OfflineEquipmentGroupsByUIC($uicID: ID!, $nextToken: String) {
-    equipmentGroupsByUicID(uicID: $uicID, limit: 1000, nextToken: $nextToken) {
+    equipmentGroupsByUicID(
+      uicID: $uicID,
+      filter: { _deleted: { ne: true } },
+      limit: 1000,
+      nextToken: $nextToken
+    ) {
       items {
         id
         name
@@ -78,12 +92,11 @@ const GROUPS_BY_UIC = gql`
         _lastChangedAt
       }
       nextToken
-      startedAt
     }
   }
 `;
 
-const HAND_RECEIPTS_BY_UIC = gql`
+const HAND_RECEIPTS_BY_UIC = /* GraphQL */ `
   query OfflineHandReceiptsByUIC($uicID: ID!, $nextToken: String) {
     handReceiptStatusesByFromUIC(
       fromUIC: $uicID,
@@ -108,12 +121,11 @@ const HAND_RECEIPTS_BY_UIC = gql`
         _lastChangedAt
       }
       nextToken
-      startedAt
     }
   }
 `;
 
-const ACCOUNTABILITY_SESSIONS_BY_UIC = gql`
+const ACCOUNTABILITY_SESSIONS_BY_UIC = /* GraphQL */ `
   query OfflineAccountabilitySessionsByUIC($uicID: ID!, $nextToken: String) {
     accountabilitySessionsByUicID(
       uicID: $uicID,
@@ -137,14 +149,18 @@ const ACCOUNTABILITY_SESSIONS_BY_UIC = gql`
         _lastChangedAt
       }
       nextToken
-      startedAt
     }
   }
 `;
 
-const ACCOUNTABILITY_ITEMS_BY_SESSION = gql`
+const ACCOUNTABILITY_ITEMS_BY_SESSION = /* GraphQL */ `
   query OfflineAccountabilityItemsBySession($sessionID: ID!, $nextToken: String) {
-    accountabilityItemsBySessionID(sessionID: $sessionID, limit: 1000, nextToken: $nextToken) {
+    accountabilityItemsBySessionID(
+      sessionID: $sessionID,
+      filter: { _deleted: { ne: true } },
+      limit: 1000,
+      nextToken: $nextToken
+    ) {
       items {
         id
         sessionID
@@ -163,12 +179,11 @@ const ACCOUNTABILITY_ITEMS_BY_SESSION = gql`
         _lastChangedAt
       }
       nextToken
-      startedAt
     }
   }
 `;
 
-const GET_EQUIPMENT_MASTER = gql`
+const GET_EQUIPMENT_MASTER = /* GraphQL */ `
   query OfflineGetEquipmentMaster($id: ID!) {
     getEquipmentMaster(id: $id) {
       id
@@ -192,8 +207,6 @@ const GET_EQUIPMENT_MASTER = gql`
   }
 `;
 
-const CREATE_CHECK_IN_EVENT = gql(createAccountabilityCheckInEvent);
-
 async function currentUserId() {
   const user = await getCurrentUser();
   return user?.userId || user?.username;
@@ -212,18 +225,58 @@ function liveItems(items = []) {
   return items.filter(item => item && item._deleted !== true);
 }
 
+function graphQLErrorMessage(error) {
+  if (error?.message) {
+    return error.message;
+  }
+
+  if (Array.isArray(error?.errors)) {
+    return error.errors.map(item => item?.message || JSON.stringify(item)).join('; ');
+  }
+
+  if (Array.isArray(error?.data?.errors)) {
+    return error.data.errors.map(item => item?.message || JSON.stringify(item)).join('; ');
+  }
+
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
+  }
+}
+
+function assertGraphQLResult(result, rootKey) {
+  if (result?.errors?.length) {
+    const messages = result.errors.map(error => error.message).filter(Boolean).join('; ');
+    throw new Error(messages || `GraphQL query ${rootKey} failed.`);
+  }
+
+  return result?.data?.[rootKey] || {};
+}
+
+async function runGraphQL(client, request, rootKey) {
+  try {
+    const result = await client.graphql(request);
+    return assertGraphQLResult(result, rootKey);
+  } catch (error) {
+    throw new Error(`${rootKey}: ${graphQLErrorMessage(error)}`);
+  }
+}
+
 async function collectConnection(client, query, variables, rootKey) {
   let nextToken = null;
   let items = [];
   let startedAt = null;
 
   do {
-    const result = await client.query({
+    const connection = await runGraphQL(client, {
       query,
       variables: { ...variables, nextToken },
-      fetchPolicy: 'network-only'
-    });
-    const connection = result.data?.[rootKey] || {};
+      headers: {
+        'Cache-Control': 'no-cache',
+        'x-cache-buster': new Date().getTime().toString()
+      }
+    }, rootKey);
     items = items.concat(liveItems(connection.items || []));
     nextToken = connection.nextToken;
     startedAt = connection.startedAt || startedAt;
@@ -303,6 +356,21 @@ export async function unpinUIC(uicID, userId = null) {
   return setCached(PINNED_UICS_KEY(resolvedUserId), [...pinned]);
 }
 
+export async function getCachedActiveUIC(userId = null) {
+  const resolvedUserId = userId || await currentUserId();
+  return getCached(ACTIVE_UIC_KEY(resolvedUserId));
+}
+
+export async function setCachedActiveUIC(uicID, userId = null) {
+  if (!uicID) {
+    return null;
+  }
+
+  const resolvedUserId = userId || await currentUserId();
+  await setCached(ACTIVE_UIC_KEY(resolvedUserId), uicID);
+  return uicID;
+}
+
 export async function loadCachedUnitOfflineSnapshot(uicID, userId = null) {
   const resolvedUserId = userId || await currentUserId();
   return getCached(SNAPSHOT_KEY(resolvedUserId, uicID));
@@ -310,6 +378,7 @@ export async function loadCachedUnitOfflineSnapshot(uicID, userId = null) {
 
 export async function cacheUnitOfflineSnapshot(snapshot, userId = null) {
   const resolvedUserId = userId || await currentUserId();
+  await setCachedActiveUIC(snapshot.uicID, resolvedUserId);
   return setCached(SNAPSHOT_KEY(resolvedUserId, snapshot.uicID), {
     ...snapshot,
     cachedForUserId: resolvedUserId,
@@ -324,7 +393,7 @@ export async function removeCachedUnitOfflineSnapshot(uicID, userId = null) {
 }
 
 export async function getUnitOfflineSnapshot(uicID) {
-  const client = await getApolloClient();
+  const client = generateClient();
 
   const [
     soldiersResult,
@@ -348,12 +417,14 @@ export async function getUnitOfflineSnapshot(uicID) {
 
   const masterIds = [...new Set(equipmentResult.items.map(item => item.equipmentMasterID).filter(Boolean))];
   const equipmentMasters = liveItems(await Promise.all(masterIds.map(async id => {
-    const result = await client.query({
+    return runGraphQL(client, {
       query: GET_EQUIPMENT_MASTER,
       variables: { id },
-      fetchPolicy: 'network-only'
-    });
-    return result.data?.getEquipmentMaster;
+      headers: {
+        'Cache-Control': 'no-cache',
+        'x-cache-buster': new Date().getTime().toString()
+      }
+    }, 'getEquipmentMaster');
   })));
 
   const parts = {
@@ -371,13 +442,7 @@ export async function getUnitOfflineSnapshot(uicID) {
     equipmentMasters,
     custodyRows: buildCustodyRows({ ...parts, equipmentMasters }),
     snapshotToken: buildSnapshotToken(parts),
-    serverStartedAt: Math.max(
-      soldiersResult.startedAt || 0,
-      equipmentResult.startedAt || 0,
-      groupsResult.startedAt || 0,
-      receiptsResult.startedAt || 0,
-      sessionsResult.startedAt || 0
-    )
+    serverStartedAt: Date.now()
   };
 
   return cacheUnitOfflineSnapshot(snapshot);
@@ -446,7 +511,7 @@ export async function submitPendingCheckIns() {
     return { submitted: 0, failed: 0, failures: [] };
   }
 
-  const client = await getApolloClient();
+  const client = generateClient();
   const results = [];
 
   for (const event of pending) {
@@ -472,10 +537,10 @@ export async function submitPendingCheckIns() {
         updatedAt: new Date().toISOString()
       };
 
-      await client.mutate({
-        mutation: CREATE_CHECK_IN_EVENT,
+      await runGraphQL(client, {
+        query: createAccountabilityCheckInEvent,
         variables: { input }
-      });
+      }, 'createAccountabilityCheckInEvent');
       results.push({ ...event, syncState: 'synced', syncedAt: new Date().toISOString() });
     } catch (error) {
       console.error('Failed to submit offline check-in event:', error);
