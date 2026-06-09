@@ -1,4 +1,7 @@
-type UIC @model
+import { defineData } from '@aws-amplify/backend';
+import type { Backend } from '../backend';
+
+const schema = `type UIC @model
 @auth(rules: [
   { allow: private },
   { allow: owner, operations: [read] }
@@ -370,4 +373,41 @@ type AdditionalUIC @model
   _deleted: Boolean
   _version: Int
   _lastChangedAt: AWSTimestamp
-}
+}`;
+
+const liveModelNameToTableNameMapping = {
+  UIC: 'UIC-qugplf4h6zc73kxb34z4zewev4-dev',
+  User: 'User-qugplf4h6zc73kxb34z4zewev4-dev',
+  UICMembershipRequest:
+    'UICMembershipRequest-qugplf4h6zc73kxb34z4zewev4-dev',
+  UICCreationRequest: 'UICCreationRequest-qugplf4h6zc73kxb34z4zewev4-dev',
+  Soldier: 'Soldier-qugplf4h6zc73kxb34z4zewev4-dev',
+  EquipmentMaster: 'EquipmentMaster-qugplf4h6zc73kxb34z4zewev4-dev',
+  EquipmentItem: 'EquipmentItem-qugplf4h6zc73kxb34z4zewev4-dev',
+  EquipmentGroup: 'EquipmentGroup-qugplf4h6zc73kxb34z4zewev4-dev',
+  HandReceiptStatus: 'HandReceiptStatus-qugplf4h6zc73kxb34z4zewev4-dev',
+  AccountabilitySession:
+    'AccountabilitySession-qugplf4h6zc73kxb34z4zewev4-dev',
+  AccountabilityItem: 'AccountabilityItem-qugplf4h6zc73kxb34z4zewev4-dev',
+  AccountabilityCheckInEvent:
+    'AccountabilityCheckInEvent-qugplf4h6zc73kxb34z4zewev4-dev',
+  AdditionalUIC: 'AdditionalUIC-qugplf4h6zc73kxb34z4zewev4-dev',
+};
+
+export const data = defineData({
+  migratedAmplifyGen1DynamoDbTableMappings: [
+    {
+      branchName: 'gen2-offline-migration',
+      modelNameToTableNameMapping: liveModelNameToTableNameMapping,
+    },
+    {
+      branchName: 'main',
+      modelNameToTableNameMapping: liveModelNameToTableNameMapping,
+    },
+  ],
+  authorizationModes: {
+    defaultAuthorizationMode: 'userPool',
+  },
+  schema,
+});
+

@@ -11,7 +11,7 @@
     "@testing-library/user-event": "^13.5.0",
     "apollo3-cache-persist": "^0.15.0",
     "aws-amplify": "^6.16.2",
-    "graphql": "^16.10.0",
+    "graphql": "15.10.1",
     "localforage": "^1.10.0",
     "pdf-lib": "^1.17.1",
     "react": "^19.0.0",
@@ -48,8 +48,22 @@
       "last 1 safari version"
     ]
   },
+  "overrides": {
+    "graphql": "15.10.1"
+  },
   "devDependencies": {
+    "@aws-amplify/backend": "^1.18.0",
+    "@aws-amplify/backend-cli": "^1.8.0",
+    "@aws-amplify/backend-data": "^1.6.2",
     "@aws-amplify/cli": "^14.5.0",
-    "@playwright/test": "^1.60.0"
+    "@playwright/test": "^1.60.0",
+    "@types/aws-lambda": "^8.10.92",
+    "@types/node": "*",
+    "aws-cdk": "^2",
+    "aws-cdk-lib": "^2",
+    "ci-info": "^4.3.1",
+    "constructs": "^10.0.0",
+    "esbuild": "^0.27.0",
+    "tsx": "^4.20.6"
   }
 }
