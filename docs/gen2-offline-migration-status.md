@@ -90,12 +90,57 @@ node C:\Users\Nathaniel\supply_sgt\supply-sgt-app\node_modules\@aws-amplify\cli\
 node C:\Users\Nathaniel\supply_sgt\supply-sgt-app\node_modules\@aws-amplify\cli\lib\run.js gen2-migration lock --rollback
 ```
 
+## Production backend cutover completed
+
+The production refactor was run on June 8, 2026 with:
+
+```powershell
+node C:\Users\Nathaniel\supply_sgt\supply-sgt-app\node_modules\@aws-amplify\cli\lib\run.js gen2-migration refactor --to amplify-d32o5wudsuc2eh-gen2offlinemigration-branch-29274b3266 --skip-validations --yes
+```
+
+The first refactor attempt without `--yes` stopped before mutation because the CLI could not prompt in the non-interactive shell. The `--yes` run completed successfully.
+
+Stateful resources now owned by Gen 2:
+
+- Cognito user pool: `us-east-1_GzkyUvzWd`
+- Cognito web client: `6orvthkmh7hmusd7iao6it08eu`
+- Cognito identity pool: `us-east-1:412f871c-97a9-4e1f-95a5-2b362307a24e`
+- S3 bucket: `supplysgtapp143c061359bc4407bdefc8dd9b6c476ea792b-dev`
+- Auxiliary DynamoDB table: `dynamo4062985a-dev`
+
+After refactor, `postRefactor();` was enabled in `amplify/backend.ts` and the Gen 2 backend was redeployed with `ampx pipeline-deploy`. Fresh outputs were written to:
+
+```text
+C:\Users\Nathaniel\supply_sgt\supplysgt-gen2-cutover-20260608-205803\gen2-post-refactor-outputs\amplify_outputs.json
+```
+
+Post-refactor outputs:
+
+- AppSync API ID: `fog6zid7xjea7ar5sxtfla5a7m`
+- AppSync endpoint: `https://t5y2iz5nxbgsxmd6zxtptsgvk4.appsync-api.us-east-1.amazonaws.com/graphql`
+- Cognito user pool: `us-east-1_GzkyUvzWd`
+- Cognito web client: `6orvthkmh7hmusd7iao6it08eu`
+- S3 bucket: `supplysgtapp143c061359bc4407bdefc8dd9b6c476ea792b-dev`
+
+Amplify Hosting app `d32o5wudsuc2eh` was updated so `SSGT_APPSYNC_GRAPHQL_ENDPOINT` points to the Gen 2 endpoint. A `main` release job (`5`) completed successfully.
+
+Production verification:
+
+- `https://supplysgt.net` returned HTTP 200 and served `static/js/main.a20a9570.js`.
+- `https://www.supplysgt.net` returned HTTP 200 and served `static/js/main.a20a9570.js`.
+- The production JS bundle contains the Gen 2 endpoint and does not contain the old Gen 1 endpoint.
+- Browser smoke rendered the Amplify sign-in screen with no console warnings/errors.
+- The sign-in password visibility switch toggled correctly.
+
+Not yet completed in this checkpoint:
+
+- Credentialed login/onboarding/roster/inventory/issue/return/accountability smoke was not run in-browser in this step.
+- Gen 1 stateless stacks and holding stacks have not been decommissioned.
+- The stale Gen 1 assessment false positive is still documented for historical context.
+
 ## Next cloud steps
 
-1. Decide whether to accept the stale assessment false positive and run the supervised refactor command above.
-2. After successful refactor, uncomment `postRefactor();` in `amplify/backend.ts` and redeploy the Gen 2 backend so generated outputs point at the adopted live Cognito, S3, and DynamoDB stateful resources.
-3. Update the production `main` Amplify Hosting branch outputs/env vars and rebuild `main`.
-4. Run the full smoke suite after production frontend rebuild:
+1. Run the credentialed product smoke suite:
    - auth sign-in/sign-out;
    - onboarding and approval queues;
    - roster;
@@ -104,4 +149,6 @@ node C:\Users\Nathaniel\supply_sgt\supply-sgt-app\node_modules\@aws-amplify\cli\
    - accountability online;
    - accountability offline check-in queue and reconnect sync;
    - storage downloads.
-5. Keep Gen 1 stateless resources and the old frontend rollback path available until post-cutover checks are clean.
+2. Watch CloudWatch/AppSync/Cognito errors through the first real user sessions.
+3. Keep Gen 1 stateless resources and the old frontend rollback path available until post-cutover checks are clean.
+4. Plan a separate cleanup step for old Gen 1 stateless stacks and Gen 2 holding stacks only after rollback confidence is high.

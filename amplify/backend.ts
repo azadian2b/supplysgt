@@ -30,5 +30,4 @@ export function postRefactor() {
   Tags.of(backend.stack).add('gen2-migration/post-refactor', 'true');
 }
 
-// Uncomment after refactor
-// postRefactor();
+postRefactor();
